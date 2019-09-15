@@ -25,7 +25,7 @@ const getKVUpdater = <K, V>(
   updater: VinKVUpdater<K, V>
 ): Updater<[K, V]> => kv => [kv[0], updater(kv)];
 
-const getUpdatedValue = <V>(selector: Selector<V>, updater: Updater<V>) => (
+const updateSelectively = <V>(selector: Selector<V>, updater: Updater<V>) => (
   v: V
 ): V => (selector(v) ? updater(v) : v);
 
@@ -40,10 +40,10 @@ const getUpdatedValue = <V>(selector: Selector<V>, updater: Updater<V>) => (
  * Function that takes a an item from the array and that needs to return an updated item.
  * Only called when the selector returns true for the same item.
  */
-export const getUpdatedArray = <V>(
+export const updateSomeInArray = <V>(
   selector: Selector<V>,
   updater: Updater<V>
-): Updater<V[]> => array => array.map(getUpdatedValue(selector, updater));
+): Updater<V[]> => array => array.map(updateSelectively(selector, updater));
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
@@ -57,13 +57,29 @@ export const getUpdatedArray = <V>(
  * Only called when the selector returns true for the same pair. In order to cater for the
  * most common use case, this function does not enable you to update the key.
  */
-export const getUpdatedObjMap = <V>(
+export const updateSomeInObjMap = <V>(
   selector: Selector<[string, V]>,
   updater: VinKVUpdater<string, V>
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(
-    Object.entries(objMap).map(getUpdatedValue(selector, getKVUpdater(updater)))
+    Object.entries(objMap).map(
+      updateSelectively(selector, getKVUpdater(updater))
+    )
   );
+
+/**
+ * Curried function that takes an updater fn (A) and returns a
+ * function that takes an object and returns a shallow copy for which
+ * all values are selectively updated using A.
+ * @param updater
+ * Function that takes a key-value pair (object entry) and that needs to return an updated value.
+ * Only called when the selector returns true for the same pair. In order to cater for the
+ * most common use case, this function does not enable you to update the key.
+ */
+export const updateAllInObjMap = <V>(
+  updater: VinKVUpdater<string, V>
+): Updater<ObjMap<V>> => objMap =>
+  Object.fromEntries(Object.entries(objMap).map(getKVUpdater(updater)));
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
@@ -77,12 +93,15 @@ export const getUpdatedObjMap = <V>(
  * Only called when the selector returns true for the same pair. In order to cater for the
  * most common use case, this function does not enable you to update the key.
  */
-export const getUpdatedMap = <K, V>(
+export const updateSomeInMap = <K, V>(
   selector: Selector<[K, V]>,
   updater: VinKVUpdater<K, V>
 ): Updater<Map<K, V>> => map =>
   new Map(
-    Array.from(map.entries(), getUpdatedValue(selector, getKVUpdater(updater)))
+    Array.from(
+      map.entries(),
+      updateSelectively(selector, getKVUpdater(updater))
+    )
   );
 
 export const isSelectionKeyDown = (event: React.MouseEvent<any>) => {

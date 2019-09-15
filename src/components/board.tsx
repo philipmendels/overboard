@@ -3,9 +3,9 @@ import { VectorData, Vector, V } from "../models/geom/vector.model";
 import { useRef, useState, useEffect } from "react";
 import { CardData, createNewCard } from "../models/card";
 import {
-  getUpdatedArray,
   handleSelection,
-  getUpdatedObjMap
+  updateAllInObjMap,
+  updateSomeInArray
 } from "../util/util";
 import { Action, registerAction, doAction, undo } from "../util/action-util";
 import * as React from "react";
@@ -100,18 +100,15 @@ export const Board: React.FC = () => {
   const startMoveCards = (location: Vector) => {
     uiRef.current.dragStart = location;
     setSelection(
-      getUpdatedObjMap(
-        () => true,
-        ([id, _]) => ({
-          startMoveMouseOffset: V(getCard(id)!.location).subtract(location)
-        })
-      )
+      updateAllInObjMap(([id, _]) => ({
+        startMoveMouseOffset: V(getCard(id)!.location).subtract(location)
+      }))
     );
   };
 
   const moveCards = (selection: MovePayload["selection"], to: VectorData) => {
     setCards(
-      getUpdatedArray(isCardInSelection(selection), card => ({
+      updateSomeInArray(isCardInSelection(selection), card => ({
         ...card,
         location: V(to).add(selection[card.id].startMoveMouseOffset)
       }))
