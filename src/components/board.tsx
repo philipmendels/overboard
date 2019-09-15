@@ -5,7 +5,13 @@ import { CardData, createNewCard } from "../models/card";
 import {
   handleSelection,
   updateAllInObjMap,
-  updateSomeInArray
+  updateSomeInArray,
+  merge,
+  filterObjMap,
+  addToObjMap,
+  keyEqualsNot,
+  valueToKV,
+  idEquals
 } from "../util/util";
 import { Action, registerAction, doAction, undo } from "../util/action-util";
 import * as React from "react";
@@ -33,7 +39,7 @@ const initialSelection: SelectedItemsState = {};
 
 export const Board: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
-  const getCard = (id: string) => cards.find(card => card.id === id);
+  const getCard = (id: string) => cards.find(idEquals(id));
   const [selection, setSelection] = useState(initialSelection);
   const isCardInSelection = (selection: SelectedItemsState) => (
     card: CardData
@@ -45,18 +51,10 @@ export const Board: React.FC = () => {
   const clearSelection = () => setSelection(initialSelection);
   const hasSelection = () => Boolean(Object.keys(selection).length);
   const selectCards = (ids: string[]) => {
-    setSelection(prev => ({
-      ...prev,
-      ...ids.reduce<SelectedItemsState>((acc, id) => {
-        acc[id] = {};
-        return acc;
-      }, {})
-    }));
+    setSelection(addToObjMap(ids.map(valueToKV({}))));
   };
   const deselectCard = (id: string) => {
-    const clone = { ...selection };
-    delete clone[id];
-    setSelection(clone);
+    setSelection(filterObjMap(keyEqualsNot(id)));
   };
 
   const uiRef = useRef({

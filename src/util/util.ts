@@ -4,6 +4,18 @@ type Selector<V> = (value: V) => boolean;
 type Updater<V> = (value: V) => V;
 type VinKVUpdater<K, V> = (kv: [K, V]) => V;
 
+interface ObjWithId {
+  id: string;
+  [key: string]: any;
+}
+
+const valueEquals = <V>(v: V) => (v: V) => v === v;
+export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
+const keyEquals = <K, V>(key: K) => ([k, _]: [K, V]) => key === k;
+export const keyEqualsNot = <K, V>(key: K) => ([k, _]: [K, V]) => key !== k;
+
+export const valueToKV = <K, V>(v: V) => (k: K) => [k, v] as [K, V];
+
 export const merge = <V extends object>(
   partial: Partial<V>
 ): Updater<V> => object => ({
@@ -43,7 +55,10 @@ const updateSelectively = <V>(selector: Selector<V>, updater: Updater<V>) => (
 export const updateSomeInArray = <V>(
   selector: Selector<V>,
   updater: Updater<V>
-): Updater<V[]> => array => array.map(updateSelectively(selector, updater));
+): Updater<V[]> => mapArray(updateSelectively(selector, updater));
+
+export const mapArray = <V>(mapFn: Updater<V>): Updater<V[]> => array =>
+  array.map(mapFn);
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
@@ -60,17 +75,13 @@ export const updateSomeInArray = <V>(
 export const updateSomeInObjMap = <V>(
   selector: Selector<[string, V]>,
   updater: VinKVUpdater<string, V>
-): Updater<ObjMap<V>> => objMap =>
-  Object.fromEntries(
-    Object.entries(objMap).map(
-      updateSelectively(selector, getKVUpdater(updater))
-    )
-  );
+): Updater<ObjMap<V>> =>
+  mapObjMap(updateSelectively(selector, getKVUpdater(updater)));
 
 /**
  * Curried function that takes an updater fn (A) and returns a
  * function that takes an object and returns a shallow copy for which
- * all values are selectively updated using A.
+ * all values are updated using A.
  * @param updater
  * Function that takes a key-value pair (object entry) and that needs to return an updated value.
  * Only called when the selector returns true for the same pair. In order to cater for the
@@ -78,8 +89,20 @@ export const updateSomeInObjMap = <V>(
  */
 export const updateAllInObjMap = <V>(
   updater: VinKVUpdater<string, V>
+): Updater<ObjMap<V>> => mapObjMap(getKVUpdater(updater));
+
+export const mapObjMap = <V>(
+  updater: Updater<[string, V]>
 ): Updater<ObjMap<V>> => objMap =>
-  Object.fromEntries(Object.entries(objMap).map(getKVUpdater(updater)));
+  Object.fromEntries(Object.entries(objMap).map(updater));
+
+export const filterObjMap = <V>(
+  filter: Selector<[string, V]>
+): Updater<ObjMap<V>> => objMap =>
+  Object.fromEntries(Object.entries(objMap).filter(filter));
+
+export const addToObjMap = <V>(entries: [string, V][]) =>
+  merge<ObjMap<V>>(Object.fromEntries(entries));
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
