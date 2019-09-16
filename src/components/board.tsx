@@ -11,7 +11,9 @@ import {
   addToObjMap,
   keyEqualsNot,
   valueToKV,
-  idEquals
+  idEquals,
+  BoundsToStyle,
+  concatArray
 } from "../util/util";
 import { Action, registerAction, doAction, undo } from "../util/action-util";
 import * as React from "react";
@@ -21,6 +23,7 @@ import {
   SelectedItem,
   MoveActionItemState
 } from "../models/selection";
+import { Bounds } from "../models/geom/bounds.model";
 
 interface MovePayload {
   selection: {
@@ -39,29 +42,16 @@ const initialSelection: SelectedItemsState = {};
 
 export const Board: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
-  const getCard = (id: string) => cards.find(idEquals(id));
   const [selection, setSelection] = useState(initialSelection);
-  const isCardInSelection = (selection: SelectedItemsState) => (
-    card: CardData
-  ) => selection[card.id] !== undefined;
-  const isSelected = isCardInSelection(selection);
-  const getCardsInSelection = (selection: SelectedItemsState) =>
-    cards.filter(isCardInSelection(selection));
-  const getSelectedCards = () => getCardsInSelection(selection);
-  const clearSelection = () => setSelection(initialSelection);
-  const hasSelection = () => Boolean(Object.keys(selection).length);
-  const selectCards = (ids: string[]) => {
-    setSelection(addToObjMap(ids.map(valueToKV({}))));
-  };
-  const deselectCard = (id: string) => {
-    setSelection(filterObjMap(keyEqualsNot(id)));
-  };
+  const [isDraggingMarquee, setIsDraggingMarquee] = useState(false);
+  const [marqueeBounds, setMarqueeBounds] = useState(new Bounds(0, 0, 0, 0));
 
   const uiRef = useRef({
     isDraggingCard: false,
     isMouseDownOnBoard: false,
     isMouseDownOnCard: false,
-    dragStart: null as Vector | null
+    dragStart: null as Vector | null,
+    marqueeStartLocation: null as Vector | null
   });
 
   const actionsRef = useRef({
@@ -78,12 +68,33 @@ export const Board: React.FC = () => {
     });
   }, []);
 
+  const getCard = (id: string) => cards.find(idEquals(id));
+  const isCardInSelection = (selection: SelectedItemsState) => (
+    card: CardData
+  ) => selection[card.id] !== undefined;
+  const isSelected = isCardInSelection(selection);
+  const getCardsInSelection = (selection: SelectedItemsState) =>
+    cards.filter(isCardInSelection(selection));
+  const getSelectedCards = () => getCardsInSelection(selection);
+  const clearSelection = () => setSelection(initialSelection);
+  const hasSelection = () => Boolean(Object.keys(selection).length);
+  const selectCards = (ids: string[]) => {
+    setSelection(addToObjMap(ids.map(valueToKV({}))));
+  };
+  const deselectCard = (id: string) => {
+    setSelection(filterObjMap(keyEqualsNot(id)));
+  };
+
   const mouseDownOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     if (hasSelection()) {
       clearSelection();
     }
     uiRef.current.isMouseDownOnBoard = true;
-    // this.marqueeStartLocation = new Vector(event.clientX, event.clientY).subtract(this.getOffset());
+
+    uiRef.current.marqueeStartLocation = new Vector(
+      event.clientX,
+      event.clientY
+    );
   };
 
   const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
@@ -91,8 +102,29 @@ export const Board: React.FC = () => {
     if (uiRef.current.isMouseDownOnCard) {
       uiRef.current.isDraggingCard = true;
       moveCards(selection as MovePayload["selection"], boardLocation);
+    } else if (uiRef.current.isMouseDownOnBoard) {
+      const start = uiRef.current.marqueeStartLocation!;
+      setIsDraggingMarquee(true);
+      setMarqueeBounds(
+        new Bounds(
+          Math.min(boardLocation.x, start.x),
+          Math.min(boardLocation.y, start.y),
+          Math.max(boardLocation.x, start.x),
+          Math.max(boardLocation.y, start.y)
+        )
+      );
     }
     event.stopPropagation();
+  };
+
+  const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
+    setCards(
+      concatArray(
+        createNewCard(
+          new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
+        )
+      )
+    );
   };
 
   const startMoveCards = (location: Vector) => {
@@ -130,7 +162,21 @@ export const Board: React.FC = () => {
 
   const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
-    if (uiRef.current.isDraggingCard) {
+    if (isDraggingMarquee) {
+      const cardIdsToSelect = cards
+        .filter(card => {
+          const cardBounds = Bounds.fromRect(
+            Vector.fromData(card.location),
+            Vector.fromData(card.dimensions)
+          );
+          return cardBounds.intersectsBounds(marqueeBounds);
+        })
+        .map(card => card.id);
+
+      if (cardIdsToSelect.length) {
+        selectCards(cardIdsToSelect);
+      }
+    } else if (uiRef.current.isDraggingCard) {
       uiRef.current.isDraggingCard = false;
       doAction(actionsRef.current.move!, {
         selection: selection as MovePayload["selection"],
@@ -140,6 +186,8 @@ export const Board: React.FC = () => {
     }
     uiRef.current.isMouseDownOnBoard = false;
     uiRef.current.isMouseDownOnCard = false;
+    uiRef.current.isDraggingCard = false;
+    setIsDraggingMarquee(false);
   };
 
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -159,6 +207,7 @@ export const Board: React.FC = () => {
       onMouseDown={mouseDownOnBoard}
       onMouseUp={mouseUpOnBoard}
       onKeyDown={keyDownOnBoard}
+      onDoubleClick={dblclickBoard}
     >
       {cards.map(card => (
         <Card
@@ -173,12 +222,13 @@ export const Board: React.FC = () => {
           {card.text}
         </Card>
       ))}
+      {isDraggingMarquee && <Marquee style={BoundsToStyle(marqueeBounds)} />}
     </Root>
   );
 };
 
 const Root = styled.div`
-  background-color: white;
+  /* background-color: white; */
   width: 100vw;
   height: 100vh;
   outline: "none";
@@ -197,4 +247,11 @@ const Card = styled.div`
   cursor: move;
   user-select: none;
   box-sizing: border-box;
+`;
+
+const Marquee = styled.div`
+  background-color: transparent;
+  border: 1px dashed black;
+  position: absolute;
+  pointer-events: none;
 `;

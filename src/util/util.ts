@@ -1,3 +1,6 @@
+import { Bounds } from "../models/geom/bounds.model";
+import { css } from "@emotion/core";
+
 type ObjMap<V> = { [key: string]: V };
 
 type Selector<V> = (value: V) => boolean;
@@ -60,6 +63,9 @@ export const updateSomeInArray = <V>(
 export const mapArray = <V>(mapFn: Updater<V>): Updater<V[]> => array =>
   array.map(mapFn);
 
+export const concatArray = <V>(arrayOrValue: V[] | V): Updater<V[]> => arr =>
+  arr.concat(arrayOrValue);
+
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
  * function that takes an object and returns a shallow copy for which
@@ -101,8 +107,10 @@ export const filterObjMap = <V>(
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(Object.entries(objMap).filter(filter));
 
-export const addToObjMap = <V>(entries: [string, V][]) =>
-  merge<ObjMap<V>>(Object.fromEntries(entries));
+export const addToObjMap = <V>(
+  entryOrEntries: [string, V][]
+): Updater<ObjMap<V>> => objMap =>
+  Object.fromEntries(Object.entries(objMap).concat(entryOrEntries));
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
@@ -154,3 +162,19 @@ export const handleSelection = (
     }
   }
 };
+
+export const px = (v: string | number) => v + "px";
+
+export const BoundsToCSS = (bounds: Bounds) => css`
+  left: ${bounds.left()}px;
+  right: ${bounds.right()}px;
+  top: ${bounds.top()}px;
+  bottom: ${bounds.bottom()}px;
+`;
+
+export const BoundsToStyle = (bounds: Bounds) => ({
+  left: bounds.left() + "px",
+  top: bounds.top() + "px",
+  width: bounds.width() + "px",
+  height: bounds.height() + "px"
+});
