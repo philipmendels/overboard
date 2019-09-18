@@ -172,9 +172,16 @@ export const BoundsToCSS = (bounds: Bounds) => css`
   bottom: ${bounds.bottom()}px;
 `;
 
-export const BoundsToStyle = (bounds: Bounds) => ({
+export const BoundsToRectStyle = (bounds: Bounds) => ({
   left: bounds.left() + "px",
   top: bounds.top() + "px",
   width: bounds.width() + "px",
   height: bounds.height() + "px"
+});
+
+export const BoundsToBoundsStyle = (bounds: Bounds) => ({
+  left: bounds.left() + "px",
+  top: bounds.top() + "px",
+  right: bounds.right() + "px",
+  bottom: bounds.bottom() + "px"
 });

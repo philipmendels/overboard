@@ -12,8 +12,9 @@ import {
   keyEqualsNot,
   valueToKV,
   idEquals,
-  BoundsToStyle,
-  concatArray
+  BoundsToBoundsStyle,
+  concatArray,
+  BoundsToRectStyle
 } from "../util/util";
 import { Action, registerAction, doAction, undo } from "../util/action-util";
 import * as React from "react";
@@ -24,6 +25,8 @@ import {
   MoveActionItemState
 } from "../models/selection";
 import { Bounds } from "../models/geom/bounds.model";
+import { TransformTool } from "./transform-tool/transform-tool.model";
+import { TransformHandle } from "./transform-tool/transform-handle.model";
 
 interface MovePayload {
   selection: {
@@ -51,7 +54,9 @@ export const Board: React.FC = () => {
     isMouseDownOnBoard: false,
     isMouseDownOnCard: false,
     dragStart: null as Vector | null,
-    marqueeStartLocation: null as Vector | null
+    marqueeStartLocation: null as Vector | null,
+    transformTool: new TransformTool(),
+    isMouseDownOnTransformHandle: false
   });
 
   const actionsRef = useRef({
@@ -145,6 +150,8 @@ export const Board: React.FC = () => {
     );
   };
 
+  const startScaleCards = (handle: TransformHandle) => {};
+
   const mouseDownOnCard = (mouseDownCard: CardData) => (
     event: React.MouseEvent<HTMLDivElement>
   ): void => {
@@ -200,6 +207,25 @@ export const Board: React.FC = () => {
     }
   };
 
+  const getTransformToolBounds = (): Bounds => {
+    const selectedCardsBoundsArray = getSelectedCards().map(card =>
+      Bounds.fromRect(
+        Vector.fromData(card.location),
+        Vector.fromData(card.dimensions)
+      )
+    );
+    return Bounds.fromShapes(selectedCardsBoundsArray);
+  };
+
+  const mouseDownOnHandle = (
+    event: React.MouseEvent<HTMLDivElement>,
+    handle: TransformHandle
+  ) => {
+    event.stopPropagation();
+    uiRef.current.isMouseDownOnTransformHandle = true;
+    startScaleCards(handle);
+  };
+
   return (
     <Root
       tabIndex={0}
@@ -214,31 +240,59 @@ export const Board: React.FC = () => {
           key={card.id}
           onMouseDown={mouseDownOnCard(card)}
           style={{
+            width: card.dimensions.x,
+            height: card.dimensions.y,
             left: card.location.x + "px",
             top: card.location.y + "px",
-            borderColor: isSelected(card) ? "#30C2FF" : "lightgray"
+            borderColor: isSelected(card) ? colors.highlight : "lightgray"
           }}
         >
           {card.text}
         </Card>
       ))}
-      {isDraggingMarquee && <Marquee style={BoundsToStyle(marqueeBounds)} />}
+      {isDraggingMarquee && (
+        <Marquee style={BoundsToBoundsStyle(marqueeBounds)} />
+      )}
+      {hasSelection() && !uiRef.current.isDraggingCard && (
+        <TransformToolDiv style={BoundsToRectStyle(getTransformToolBounds())}>
+          {uiRef.current.transformTool.handles.map((handle, index) => {
+            const handleStyle = {
+              left: handle.getStyleLeft(),
+              top: handle.getStyleTop(),
+              widht: handle.getSize(),
+              height: handle.getSize(),
+              cursor: handle.getStyleCursor()
+            };
+            return (
+              <TransformToolHandle
+                draggable={false}
+                key={index}
+                style={handleStyle}
+                onMouseDown={e => {
+                  mouseDownOnHandle(e, handle);
+                }}
+              />
+            );
+          })}
+        </TransformToolDiv>
+      )}
     </Root>
   );
+};
+
+const colors = {
+  highlight: "#30C2FF"
 };
 
 const Root = styled.div`
   /* background-color: white; */
   width: 100vw;
   height: 100vh;
-  outline: "none";
-  overflow: "hidden";
+  overflow: hidden;
   outline: none;
 `;
 
 const Card = styled.div`
-  width: 100px;
-  height: 100px;
   padding: 10px;
   background-color: white;
   position: absolute;
@@ -247,6 +301,7 @@ const Card = styled.div`
   cursor: move;
   user-select: none;
   box-sizing: border-box;
+  overflow: hidden;
 `;
 
 const Marquee = styled.div`
@@ -254,4 +309,21 @@ const Marquee = styled.div`
   border: 1px dashed black;
   position: absolute;
   pointer-events: none;
+`;
+
+const TransformToolDiv = styled.div`
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 2;
+  border: 1px solid ${colors.highlight};
+`;
+
+const TransformToolHandle = styled.div`
+  pointer-events: auto;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: ${colors.highlight};
 `;
