@@ -13,51 +13,26 @@ export type TransformationProps = {
   handle: TransformHandle,
   mouseLocation: Vector
 }
+
+// TODO: do not do this for every node
 export const getTransformation = (props: TransformationProps): Transformation => {
   const { handle, startBounds, mouseLocation, startBoundsOffset, startDimensions } = props;
-  let scaleX;
-  if (handle.isVertical()) {
-    scaleX = 1;
-  } else {
-    let newW;
-    if (handle.isOnLeftEdge()) {
-      newW = startBounds.right() - mouseLocation.x;
-    } else {
-      newW = mouseLocation.x - startBounds.left();
-    }
-    scaleX = newW / startBounds.width();
-  }
-  let x;
-  if (handle.isOnLeftEdge()) {
-    x = startBounds.right() - (startBounds.width() - startBoundsOffset.x) * scaleX;
-  } else {
-    x = startBounds.left() + (startBoundsOffset.x * scaleX);
-  }
-  const w = Math.abs(startDimensions.x * scaleX);
 
-  let scaleY;
-  if (handle.isHorizontal()) {
-    scaleY = 1;
-  } else {
-    let newH;
-    if (handle.isOnTopEdge()) {
-      newH = startBounds.bottom() - mouseLocation.y;
-    } else {
-      newH = mouseLocation.y - startBounds.top();
-    }
-    scaleY = newH / startBounds.height();
-  }
-  let y;
-  if (handle.isOnTopEdge()) {
-    y = startBounds.bottom() - (startBounds.height() - startBoundsOffset.y) * scaleY;
-  } else {
-    y = startBounds.top() + (startBoundsOffset.y * scaleY);
-  }
-  const h = Math.abs(startDimensions.y * scaleY);
+  const hFixed = handle.isOnLeftEdge() ? startBounds.right() : startBounds.left();
+  const left = handle.isVertical() ? startBounds.left() : Math.min(mouseLocation.x, hFixed);
+  const right = handle.isVertical() ? startBounds.right() : Math.max(mouseLocation.x, hFixed);
+
+  const vFixed = handle.isOnTopEdge() ? startBounds.bottom() : startBounds.top();
+  const top = handle.isHorizontal() ? startBounds.top() : Math.min(mouseLocation.y, vFixed);
+  const bottom = handle.isHorizontal() ? startBounds.bottom() : Math.max(mouseLocation.y, vFixed);
+
+  const bounds = new Bounds(left, top, right, bottom);
+  const scaleX = bounds.width() / startBounds.width();
+  const scaleY = bounds.height() / startBounds.height();
 
   return {
-    location: new Vector(x, y),
-    dimensions: new Vector(w, h)
+    location: new Vector(left + startBoundsOffset.x * scaleX, top + startBoundsOffset.y * scaleY),
+    dimensions: new Vector(startDimensions.x * scaleX, startDimensions.y * scaleY)
   }
 }
 

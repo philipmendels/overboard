@@ -5,8 +5,6 @@ export type VectorData = {
   y: number;
 };
 
-export const V = (data: VectorData) => new Vector(data.x, data.y);
-
 export class Vector {
   public static fromData(data: VectorData): Vector {
     return new Vector(data.x, data.y);
@@ -190,3 +188,5 @@ export class Vector {
     return GeomUtil.equals(this.x, v2.x) && GeomUtil.equals(this.y, v2.y);
   }
 }
+
+export const V = Vector.fromData;

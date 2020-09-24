@@ -12,10 +12,7 @@ export type ScaleActionState = {
   // scaleTransformHandle: TransformHandle
 };
 
-export type SelectedItemsState = {
-  [id: string]: SelectedItem;
-};
-
+export type SelectedItemsState = Record<string, SelectedItem>;
 export type SelectedItem = {} | MoveActionItemState | ScaleActionItemState;
 
 export type MoveActionItemState = {
@@ -26,3 +23,8 @@ export type ScaleActionItemState = {
   startScaleBoundsOffset: Vector;
   startScaleDimensions: Vector;
 };
+
+// export type SelectedItemsState = Record<string, {}> | MoveActionSelectionState | ScaleActionSelectionState;
+
+export type MoveActionSelectionState = Record<string, MoveActionItemState>;
+export type ScaleActionSelectionState = Record<string, ScaleActionItemState>;

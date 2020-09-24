@@ -1,12 +1,11 @@
 import styled from "@emotion/styled";
 import { VectorData, Vector, V } from "../models/geom/vector.model";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { CardData, createNewCard } from "../models/card";
 import {
   handleSelection,
   updateAllInObjMap,
   updateSomeInArray,
-  merge,
   filterObjMap,
   addToObjMap,
   keyEqualsNot,
@@ -14,26 +13,45 @@ import {
   idEquals,
   BoundsToBoundsStyle,
   concatArray,
-  BoundsToRectStyle
+  BoundsToRectStyle, filterArray, idEqualsNot, filterArrayById
 } from "../util/util";
-import { Action, registerAction, doAction, undo } from "../util/action-util";
 import * as React from "react";
 import {
-  SelectionState,
-  SelectedItemsState,
+  MoveActionSelectionState,
+  ScaleActionItemState,
+  ScaleActionSelectionState,
   SelectedItem,
-  MoveActionItemState
+  SelectedItemsState,
 } from "../models/selection";
 import { Bounds } from "../models/geom/bounds.model";
 import { TransformTool } from "./transform-tool/transform-tool.model";
 import { TransformHandle } from "./transform-tool/transform-handle.model";
+import { makeUndoableHandler, useUndoableEffects } from "use-flexible-undo";
+import { makeUndoableFTXHandler } from "../util/action-util";
+import { getTransformation } from "./transform-tool/transform.util";
 
 interface MovePayload {
-  selection: {
-    [id: string]: MoveActionItemState;
-  };
+  selection: MoveActionSelectionState;
   from: VectorData;
   to: VectorData;
+}
+
+interface ScalePayload {
+  scaleStartBounds: Bounds;
+  handle: TransformHandle;
+  selection: ScaleActionSelectionState;
+  from: VectorData;
+  to: VectorData;
+}
+
+interface PBT {
+  moveCards: MovePayload;
+  scaleCards: ScalePayload;
+  addCard: CardData;
+  removeCards: {
+    card: CardData;
+    index: number;
+  }[]
 }
 
 const initialCards: CardData[] = [
@@ -56,22 +74,10 @@ export const Board: React.FC = () => {
     dragStart: null as Vector | null,
     marqueeStartLocation: null as Vector | null,
     transformTool: new TransformTool(),
-    isMouseDownOnTransformHandle: false
+    isMouseDownOnTransformHandle: false,
+    scaleStartBounds: null as Bounds | null,
+    scaleTransformHandle: null as TransformHandle | null,
   });
-
-  const actionsRef = useRef({
-    move: null as Action<MovePayload> | null
-  });
-
-  useEffect(() => {
-    actionsRef.current.move = registerAction<MovePayload>({
-      id: "MOVE",
-      describe: ({ selection }) =>
-        `Move ${Object.keys(selection).length} cards`,
-      do: ({ selection, to }) => moveCards(selection, to),
-      undo: ({ selection, from }) => moveCards(selection, from)
-    });
-  }, []);
 
   const getCard = (id: string) => cards.find(idEquals(id));
   const isCardInSelection = (selection: SelectedItemsState) => (
@@ -106,7 +112,7 @@ export const Board: React.FC = () => {
     const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
     if (uiRef.current.isMouseDownOnCard) {
       uiRef.current.isDraggingCard = true;
-      moveCards(selection as MovePayload["selection"], boardLocation);
+      moveCardsHandler(boardLocation, {selection: selection as MoveActionSelectionState});
     } else if (uiRef.current.isMouseDownOnBoard) {
       const start = uiRef.current.marqueeStartLocation!;
       setIsDraggingMarquee(true);
@@ -118,18 +124,20 @@ export const Board: React.FC = () => {
           Math.max(boardLocation.y, start.y)
         )
       );
+    } else if (uiRef.current.isMouseDownOnTransformHandle) {
+      scaleCardsHandler(boardLocation, {
+        selection: selection as ScaleActionSelectionState,
+        handle: uiRef.current.scaleTransformHandle!,
+        scaleStartBounds: uiRef.current.scaleStartBounds!
+      });
     }
     event.stopPropagation();
   };
 
   const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    setCards(
-      concatArray(
-        createNewCard(
-          new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
-        )
-      )
-    );
+    addCard(createNewCard(
+      new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
+    ));
   };
 
   const startMoveCards = (location: Vector) => {
@@ -141,7 +149,8 @@ export const Board: React.FC = () => {
     );
   };
 
-  const moveCards = (selection: MovePayload["selection"], to: VectorData) => {
+  const moveCardsHandler = (to: VectorData, rest:{selection: MoveActionSelectionState}) => {
+    const {selection} = rest;
     setCards(
       updateSomeInArray(isCardInSelection(selection), card => ({
         ...card,
@@ -150,7 +159,71 @@ export const Board: React.FC = () => {
     );
   };
 
-  const startScaleCards = (handle: TransformHandle) => {};
+  const scaleCardsHandler = (boardLocation: VectorData, rest:{
+    selection: ScaleActionSelectionState,
+    scaleStartBounds: Bounds;
+    handle: TransformHandle;
+  }) => {
+    const {selection, scaleStartBounds, handle} = rest;
+    setCards(
+      updateSomeInArray(isCardInSelection(selection), card => {
+        const selectionState = selection[card.id] as ScaleActionItemState;
+        const transformation = getTransformation({
+          startBounds: scaleStartBounds,
+          startBoundsOffset: selectionState.startScaleBoundsOffset,
+          startDimensions: selectionState.startScaleDimensions,
+          handle,
+          mouseLocation: V(boardLocation)
+        });
+        return {
+          ...card,
+          location: transformation.location,
+          dimensions: transformation.dimensions,
+        }
+      })
+    );
+  };
+
+  const {undoables, undo, redo} = useUndoableEffects<PBT>({
+    handlers: {
+      moveCards: makeUndoableFTXHandler(moveCardsHandler),
+      scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
+      addCard: makeUndoableHandler(setCards)(
+        concatArray, 
+        filterArrayById,
+      ),
+      removeCards: {
+        drdo: p => setCards(prev => prev.filter(c => !p.find(item => item.card.id === c.id))),
+        undo: p => setCards(prev => {
+          // TODO: clean this up
+          const clone = prev.slice();
+          const pSorted = p.slice().sort((a,b) => a.index - b.index);
+          pSorted.forEach(item => clone.splice(item.index, 0, item.card));
+          console.log(clone);
+          return clone;
+        })
+      }
+    }
+  });
+
+  const {moveCards, scaleCards, addCard, removeCards} = undoables;
+
+  const startScaleCards = (handle: TransformHandle, location: Vector) => {
+    uiRef.current.dragStart = location;
+    const selectedCardsBounds = getTransformToolBounds();
+
+    uiRef.current.scaleStartBounds = selectedCardsBounds;
+    uiRef.current.scaleTransformHandle = handle;
+
+    setSelection(updateAllInObjMap(([id, _]) => {
+      const selectedCard = getCard(id)!;
+      return {
+        startScaleBoundsOffset: V(selectedCard.location)
+          .subtract(selectedCardsBounds.topLeft()),
+        startScaleDimensions: V(selectedCard.dimensions).clone()
+      }
+    }));
+  };
 
   const mouseDownOnCard = (mouseDownCard: CardData) => (
     event: React.MouseEvent<HTMLDivElement>
@@ -185,11 +258,20 @@ export const Board: React.FC = () => {
       }
     } else if (uiRef.current.isDraggingCard) {
       uiRef.current.isDraggingCard = false;
-      doAction(actionsRef.current.move!, {
+      moveCards({
         selection: selection as MovePayload["selection"],
         from: uiRef.current.dragStart!,
         to: boardLocation
       });
+    } else if (uiRef.current.isMouseDownOnTransformHandle) {
+      uiRef.current.isMouseDownOnTransformHandle = false;
+      scaleCards({
+        from: uiRef.current.dragStart!,
+        to: boardLocation,
+        selection: selection as ScaleActionSelectionState,
+        handle: uiRef.current.scaleTransformHandle!,
+        scaleStartBounds: uiRef.current.scaleStartBounds!
+      })
     }
     uiRef.current.isMouseDownOnBoard = false;
     uiRef.current.isMouseDownOnCard = false;
@@ -200,10 +282,16 @@ export const Board: React.FC = () => {
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.keyCode === 8 || event.keyCode === 46) {
       // backspace and delete
-      // this.props.removeCards();
+      removeCards(getSelectedCards().map(card => ({
+        card,
+        index: cards.findIndex(idEquals(card.id))
+      })));
+    }
+    if(event.key  === 'ArrowDown') {
       undo();
-      event.stopPropagation();
-      event.preventDefault();
+    }
+    if(event.key  === 'ArrowUp') {
+      redo();
     }
   };
 
@@ -223,7 +311,7 @@ export const Board: React.FC = () => {
   ) => {
     event.stopPropagation();
     uiRef.current.isMouseDownOnTransformHandle = true;
-    startScaleCards(handle);
+    startScaleCards(handle, new Vector(event.clientX, event.clientY));
   };
 
   return (

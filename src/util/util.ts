@@ -1,7 +1,7 @@
 import { Bounds } from "../models/geom/bounds.model";
 import { css } from "@emotion/core";
 
-type ObjMap<V> = { [key: string]: V };
+type ObjMap<V> = Record<string, V>;
 
 type Selector<V> = (value: V) => boolean;
 type Updater<V> = (value: V) => V;
@@ -14,6 +14,7 @@ interface ObjWithId {
 
 const valueEquals = <V>(v: V) => (v: V) => v === v;
 export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
+export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj:O) => obj.id !== id;
 const keyEquals = <K, V>(key: K) => ([k, _]: [K, V]) => key === k;
 export const keyEqualsNot = <K, V>(key: K) => ([k, _]: [K, V]) => key !== k;
 
@@ -65,6 +66,12 @@ export const mapArray = <V>(mapFn: Updater<V>): Updater<V[]> => array =>
 
 export const concatArray = <V>(arrayOrValue: V[] | V): Updater<V[]> => arr =>
   arr.concat(arrayOrValue);
+
+export const filterArray = <V>(
+  filter: Selector<V>
+): Updater<Array<V>> => array => array.filter(filter);
+
+export const filterArrayById = <O extends ObjWithId>(item: O) => filterArray(idEqualsNot(item.id))
 
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
