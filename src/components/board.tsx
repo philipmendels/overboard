@@ -11,16 +11,13 @@ import {
   keyEqualsNot,
   valueToKV,
   idEquals,
-  BoundsToBoundsStyle,
   concatArray,
-  BoundsToRectStyle, filterArray, idEqualsNot, filterArrayById
+  BoundsToRectStyle, filterArrayById
 } from "../util/util";
 import * as React from "react";
 import {
   MoveActionSelectionState,
-  ScaleActionItemState,
   ScaleActionSelectionState,
-  SelectedItem,
   SelectedItemsState,
 } from "../models/selection";
 import { Bounds } from "../models/geom/bounds.model";
@@ -28,7 +25,7 @@ import { TransformTool } from "./transform-tool/transform-tool.model";
 import { TransformHandle } from "./transform-tool/transform-handle.model";
 import { makeUndoableHandler, useUndoableEffects } from "use-flexible-undo";
 import { makeUndoableFTXHandler } from "../util/action-util";
-import { getTransformation } from "./transform-tool/transform.util";
+import { getTransformToolBounds } from "./transform-tool/transform.util";
 
 interface MovePayload {
   selection: MoveActionSelectionState;
@@ -116,14 +113,7 @@ export const Board: React.FC = () => {
     } else if (uiRef.current.isMouseDownOnBoard) {
       const start = uiRef.current.marqueeStartLocation!;
       setIsDraggingMarquee(true);
-      setMarqueeBounds(
-        new Bounds(
-          Math.min(boardLocation.x, start.x),
-          Math.min(boardLocation.y, start.y),
-          Math.max(boardLocation.x, start.x),
-          Math.max(boardLocation.y, start.y)
-        )
-      );
+      setMarqueeBounds(Bounds.fromPoints([boardLocation, start]));
     } else if (uiRef.current.isMouseDownOnTransformHandle) {
       scaleCardsHandler(boardLocation, {
         selection: selection as ScaleActionSelectionState,
@@ -165,20 +155,22 @@ export const Board: React.FC = () => {
     handle: TransformHandle;
   }) => {
     const {selection, scaleStartBounds, handle} = rest;
+    const ttBounds = getTransformToolBounds({
+      startBounds: scaleStartBounds,
+      handle,
+      mouseLocation: V(boardLocation)
+    });
+    const ttScale = new Vector(
+      ttBounds.width() / scaleStartBounds.width(), 
+      ttBounds.height() / scaleStartBounds.height()
+    );
     setCards(
       updateSomeInArray(isCardInSelection(selection), card => {
-        const selectionState = selection[card.id] as ScaleActionItemState;
-        const transformation = getTransformation({
-          startBounds: scaleStartBounds,
-          startBoundsOffset: selectionState.startScaleBoundsOffset,
-          startDimensions: selectionState.startScaleDimensions,
-          handle,
-          mouseLocation: V(boardLocation)
-        });
+        const {startScaleBoundsOffset, startScaleDimensions} = selection[card.id];
         return {
           ...card,
-          location: transformation.location,
-          dimensions: transformation.dimensions,
+          location: ttBounds.topLeft().add(startScaleBoundsOffset.scale(ttScale)),
+          dimensions: startScaleDimensions.scale(ttScale)
         }
       })
     );
@@ -199,7 +191,6 @@ export const Board: React.FC = () => {
           const clone = prev.slice();
           const pSorted = p.slice().sort((a,b) => a.index - b.index);
           pSorted.forEach(item => clone.splice(item.index, 0, item.card));
-          console.log(clone);
           return clone;
         })
       }
@@ -210,7 +201,7 @@ export const Board: React.FC = () => {
 
   const startScaleCards = (handle: TransformHandle, location: Vector) => {
     uiRef.current.dragStart = location;
-    const selectedCardsBounds = getTransformToolBounds();
+    const selectedCardsBounds = getSelectionBounds();
 
     uiRef.current.scaleStartBounds = selectedCardsBounds;
     uiRef.current.scaleTransformHandle = handle;
@@ -245,21 +236,17 @@ export const Board: React.FC = () => {
     if (isDraggingMarquee) {
       const cardIdsToSelect = cards
         .filter(card => {
-          const cardBounds = Bounds.fromRect(
-            Vector.fromData(card.location),
-            Vector.fromData(card.dimensions)
-          );
+          const cardBounds = Bounds.fromRect(card.location, card.dimensions);
           return cardBounds.intersectsBounds(marqueeBounds);
         })
         .map(card => card.id);
-
       if (cardIdsToSelect.length) {
         selectCards(cardIdsToSelect);
       }
     } else if (uiRef.current.isDraggingCard) {
       uiRef.current.isDraggingCard = false;
       moveCards({
-        selection: selection as MovePayload["selection"],
+        selection: selection as MoveActionSelectionState,
         from: uiRef.current.dragStart!,
         to: boardLocation
       });
@@ -295,12 +282,9 @@ export const Board: React.FC = () => {
     }
   };
 
-  const getTransformToolBounds = (): Bounds => {
+  const getSelectionBounds = (): Bounds => {
     const selectedCardsBoundsArray = getSelectedCards().map(card =>
-      Bounds.fromRect(
-        Vector.fromData(card.location),
-        Vector.fromData(card.dimensions)
-      )
+      Bounds.fromRect(card.location, card.dimensions)
     );
     return Bounds.fromShapes(selectedCardsBoundsArray);
   };
@@ -328,10 +312,7 @@ export const Board: React.FC = () => {
           key={card.id}
           onMouseDown={mouseDownOnCard(card)}
           style={{
-            width: card.dimensions.x,
-            height: card.dimensions.y,
-            left: card.location.x + "px",
-            top: card.location.y + "px",
+            ...BoundsToRectStyle(Bounds.fromRect(card.location, card.dimensions)),
             borderColor: isSelected(card) ? colors.highlight : "lightgray"
           }}
         >
@@ -339,10 +320,10 @@ export const Board: React.FC = () => {
         </Card>
       ))}
       {isDraggingMarquee && (
-        <Marquee style={BoundsToBoundsStyle(marqueeBounds)} />
+        <Marquee style={BoundsToRectStyle(marqueeBounds)} />
       )}
       {hasSelection() && !uiRef.current.isDraggingCard && (
-        <TransformToolDiv style={BoundsToRectStyle(getTransformToolBounds())}>
+        <TransformToolDiv style={BoundsToRectStyle(getSelectionBounds())}>
           {uiRef.current.transformTool.handles.map((handle, index) => {
             const handleStyle = {
               left: handle.getStyleLeft(),

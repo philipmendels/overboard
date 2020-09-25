@@ -89,6 +89,9 @@ export class Vector {
   public divide(amount: number): Vector {
     return new Vector(this.x / amount, this.y / amount);
   }
+  public scale(v: Vector): Vector {
+    return new Vector(this.x * v.x, this.y * v.y);
+  }
   public addLength(amount: number) {
     const length = this.dist();
     const factor = (length + amount) / length;

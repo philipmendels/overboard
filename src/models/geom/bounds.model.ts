@@ -1,7 +1,7 @@
 import { Orientation } from './direction.enum';
 import { Segment } from './segment.model';
 import { IShape } from './shape.interface';
-import { Vector } from './vector.model';
+import { Vector, VectorData } from './vector.model';
 import * as GeomUtil from './geom.util';
 
 export type BoundsData = {
@@ -13,7 +13,7 @@ export type BoundsData = {
 
 export class Bounds implements IShape {
 
-  public static fromRect(location: Vector, dimensions: Vector) {
+  public static fromRect(location: VectorData, dimensions: VectorData) {
     return new Bounds(
       location.x,
       location.y,
@@ -30,6 +30,17 @@ export class Bounds implements IShape {
     const minTop = GeomUtil.arrayMin(shapes.map(shape => shape.top()));
     const maxRight = GeomUtil.arrayMax(shapes.map(shape => shape.right()));
     const maxBottom = GeomUtil.arrayMax(shapes.map(shape => shape.bottom()));
+    return new Bounds(minLeft, minTop, maxRight, maxBottom);
+  }
+
+  public static fromPoints = (points: VectorData[]): Bounds => {
+    if (!points || !points.length) {
+      return new Bounds(0, 0, 0, 0);
+    }
+    const minLeft = GeomUtil.arrayMin(points.map(point => point.x));
+    const minTop = GeomUtil.arrayMin(points.map(point => point.y));
+    const maxRight = GeomUtil.arrayMax(points.map(point => point.x));
+    const maxBottom = GeomUtil.arrayMax(points.map(point => point.y));
     return new Bounds(minLeft, minTop, maxRight, maxBottom);
   }
 

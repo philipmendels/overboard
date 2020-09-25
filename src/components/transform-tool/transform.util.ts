@@ -2,21 +2,14 @@ import { Bounds } from "../../models/geom/bounds.model";
 import { Vector } from "../../models/geom/vector.model";
 import { TransformHandle } from "./transform-handle.model";
 
-export type Transformation = {
-  location: Vector,
-  dimensions: Vector
-}
-export type TransformationProps = {
+interface Props {
   startBounds: Bounds,
-  startBoundsOffset: Vector,
-  startDimensions: Vector,
   handle: TransformHandle,
   mouseLocation: Vector
 }
 
-// TODO: do not do this for every node
-export const getTransformation = (props: TransformationProps): Transformation => {
-  const { handle, startBounds, mouseLocation, startBoundsOffset, startDimensions } = props;
+export const getTransformToolBounds = (props: Props) => {
+  const { handle, startBounds, mouseLocation } = props;
 
   const hFixed = handle.isOnLeftEdge() ? startBounds.right() : startBounds.left();
   const left = handle.isVertical() ? startBounds.left() : Math.min(mouseLocation.x, hFixed);
@@ -26,13 +19,19 @@ export const getTransformation = (props: TransformationProps): Transformation =>
   const top = handle.isHorizontal() ? startBounds.top() : Math.min(mouseLocation.y, vFixed);
   const bottom = handle.isHorizontal() ? startBounds.bottom() : Math.max(mouseLocation.y, vFixed);
 
-  const bounds = new Bounds(left, top, right, bottom);
-  const scaleX = bounds.width() / startBounds.width();
-  const scaleY = bounds.height() / startBounds.height();
-
-  return {
-    location: new Vector(left + startBoundsOffset.x * scaleX, top + startBoundsOffset.y * scaleY),
-    dimensions: new Vector(startDimensions.x * scaleX, startDimensions.y * scaleY)
-  }
+  return new Bounds(left, top, right, bottom);
 }
+
+export const getTransformation = (
+  startBoundsOffset: Vector, 
+  startDimensions: Vector, 
+  transformToolBounds: Bounds, 
+  transformToolScale: Vector
+) => {
+  return {
+    location: transformToolBounds.topLeft().add(startBoundsOffset.scale(transformToolScale)),
+    dimensions: startDimensions.scale(transformToolScale)
+  }
+};
+
 
