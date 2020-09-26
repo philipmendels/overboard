@@ -173,22 +173,22 @@ export const handleSelection = (
 export const px = (v: string | number) => v + "px";
 
 export const BoundsToCSS = (bounds: Bounds) => css`
-  left: ${bounds.left()}px;
-  right: ${bounds.right()}px;
-  top: ${bounds.top()}px;
-  bottom: ${bounds.bottom()}px;
+  left: ${bounds.getLeft()}px;
+  right: ${bounds.getRight()}px;
+  top: ${bounds.getTop()}px;
+  bottom: ${bounds.getBottom()}px;
 `;
 
 export const BoundsToRectStyle = (bounds: Bounds) => ({
-  left: bounds.left() + "px",
-  top: bounds.top() + "px",
-  width: bounds.width() + "px",
-  height: bounds.height() + "px"
+  left: bounds.getLeft() + "px",
+  top: bounds.getTop() + "px",
+  width: bounds.getWidth() + "px",
+  height: bounds.getHeight() + "px"
 });
 
 export const BoundsToBoundsStyle = (bounds: Bounds) => ({
-  left: bounds.left() + "px",
-  top: bounds.top() + "px",
-  right: bounds.right() + "px",
-  bottom: bounds.bottom() + "px"
+  left: bounds.getLeft() + "px",
+  top: bounds.getTop() + "px",
+  right: bounds.getRight() + "px",
+  bottom: bounds.getBottom() + "px"
 });

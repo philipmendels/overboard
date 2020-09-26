@@ -1,11 +1,11 @@
 import { Bounds } from "./bounds.model";
 
 export interface IShape {
-  left(): number;
-  right(): number;
-  top(): number;
-  bottom(): number;
-  width(): number;
-  height(): number;
-  bounds(): Bounds;
+  getLeft(): number;
+  getRight(): number;
+  getTop(): number;
+  getBottom(): number;
+  getWidth(): number;
+  getHeight(): number;
+  getBounds(): Bounds;
 }

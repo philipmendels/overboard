@@ -68,7 +68,7 @@ export class Segment implements ILine, IShape {
     if (!this.line().containsPoint(point)) {
       return false;
     }
-    return this.bounds().containsPoint(point);
+    return this.getBounds().containsPoint(point);
   }
   public closestPoint(point: Vector): Vector {
     const vectorA = this.p1.deltaTo(point);
@@ -94,25 +94,25 @@ export class Segment implements ILine, IShape {
   // public intersectSegment(line:Line) {
 
   // }
-  public left(): number {
+  public getLeft(): number {
     return Math.min(this.p1.x, this.p2.x);
   }
-  public right(): number {
+  public getRight(): number {
     return Math.max(this.p1.x, this.p2.x);
   }
-  public top(): number {
+  public getTop(): number {
     return Math.min(this.p1.y, this.p2.y);
   }
-  public bottom(): number {
+  public getBottom(): number {
     return Math.max(this.p1.y, this.p2.y);
   }
-  public width(): number {
-    return this.right() - this.left();
+  public getWidth(): number {
+    return this.getRight() - this.getLeft();
   }
-  public height(): number {
-    return this.bottom() - this.top();
+  public getHeight(): number {
+    return this.getBottom() - this.getTop();
   }
-  public bounds(): Bounds {
-    return new Bounds(this.left(), this.top(), this.right(), this.bottom());
+  public getBounds(): Bounds {
+    return new Bounds(this.getLeft(), this.getTop(), this.getRight(), this.getBottom());
   }
 }

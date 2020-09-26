@@ -11,13 +11,13 @@ interface Props {
 export const getTransformToolBounds = (props: Props) => {
   const { handle, startBounds, mouseLocation } = props;
 
-  const hFixed = handle.isOnLeftEdge() ? startBounds.right() : startBounds.left();
-  const left = handle.isVertical() ? startBounds.left() : Math.min(mouseLocation.x, hFixed);
-  const right = handle.isVertical() ? startBounds.right() : Math.max(mouseLocation.x, hFixed);
+  const hFixed = handle.isOnLeftEdge() ? startBounds.getRight() : startBounds.getLeft();
+  const left = handle.isVertical() ? startBounds.getLeft() : Math.min(mouseLocation.x, hFixed);
+  const right = handle.isVertical() ? startBounds.getRight() : Math.max(mouseLocation.x, hFixed);
 
-  const vFixed = handle.isOnTopEdge() ? startBounds.bottom() : startBounds.top();
-  const top = handle.isHorizontal() ? startBounds.top() : Math.min(mouseLocation.y, vFixed);
-  const bottom = handle.isHorizontal() ? startBounds.bottom() : Math.max(mouseLocation.y, vFixed);
+  const vFixed = handle.isOnTopEdge() ? startBounds.getBottom() : startBounds.getTop();
+  const top = handle.isHorizontal() ? startBounds.getTop() : Math.min(mouseLocation.y, vFixed);
+  const bottom = handle.isHorizontal() ? startBounds.getBottom() : Math.max(mouseLocation.y, vFixed);
 
   return new Bounds(left, top, right, bottom);
 }

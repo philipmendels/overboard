@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { VectorData, Vector, V } from "../models/geom/vector.model";
-import { useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { CardData, createNewCard } from "../models/card";
 import {
   handleSelection,
@@ -20,22 +20,25 @@ import {
   ScaleActionSelectionState,
   SelectedItemsState,
 } from "../models/selection";
-import { Bounds } from "../models/geom/bounds.model";
+import { Bounds, BoundsData } from "../models/geom/bounds.model";
 import { TransformTool } from "./transform-tool/transform-tool.model";
 import { TransformHandle } from "./transform-tool/transform-handle.model";
-import { makeUndoableHandler, useUndoableEffects } from "use-flexible-undo";
+import { HistoryItemUnion, makeUndoableHandler, useUndoableEffects } from "use-flexible-undo";
 import { makeUndoableFTXHandler } from "../util/action-util";
 import { getTransformToolBounds } from "./transform-tool/transform.util";
+import { DirectionCompass, DirectionMap } from "../models/geom/direction.enum";
 
 interface MovePayload {
   selection: MoveActionSelectionState;
-  from: VectorData;
+  from: VectorData; 
+  // TODO: use topleft of selection bounds instead of mouse location?
   to: VectorData;
 }
 
 interface ScalePayload {
-  scaleStartBounds: Bounds;
-  handle: TransformHandle;
+  // TODO: use selections bounds for from and to ?
+  scaleStartBounds: BoundsData;
+  direction: DirectionCompass;
   selection: ScaleActionSelectionState;
   from: VectorData;
   to: VectorData;
@@ -50,6 +53,28 @@ interface PBT {
     index: number;
   }[]
 }
+
+type PayloadDescribers = {
+  [K in keyof PBT]: (payload: PBT[K]) => ReactNode;
+};
+
+const payloadDescribers: PayloadDescribers = {
+  moveCards: ({ from, to, selection }) => <><ActionType>Move</ActionType> {getCardsString(Object.values(selection).length)} by {V(to).subtract(V(from)).toRoundedString()}</>,
+  scaleCards: ({ selection }) => <><ActionType>Scale</ActionType> {getCardsString(Object.values(selection).length)}</>,
+  addCard: card => <><ActionType>Add</ActionType> card at {V(card.location).toRoundedString()}</>,
+  removeCards: items => <><ActionType>Remove</ActionType> {getCardsString(items.length)}</>,
+};
+
+const ActionType = styled.span`
+  font-weight: bolder;
+`;
+const getCardsString = (amount: number) => amount + ' card' + (amount === 1 ? '' : 's');
+
+const describeAction = ({
+  type,
+  payload,
+}: HistoryItemUnion<PBT>): ReactNode =>
+  type === 'start' ? 'Start' : (payloadDescribers[type] as any)(payload);
 
 const initialCards: CardData[] = [
   createNewCard(new Vector(200, 400)),
@@ -117,7 +142,7 @@ export const Board: React.FC = () => {
     } else if (uiRef.current.isMouseDownOnTransformHandle) {
       scaleCardsHandler(boardLocation, {
         selection: selection as ScaleActionSelectionState,
-        handle: uiRef.current.scaleTransformHandle!,
+        direction: uiRef.current.scaleTransformHandle!.data.directionCompass,
         scaleStartBounds: uiRef.current.scaleStartBounds!
       });
     }
@@ -150,19 +175,20 @@ export const Board: React.FC = () => {
   };
 
   const scaleCardsHandler = (boardLocation: VectorData, rest:{
-    selection: ScaleActionSelectionState,
-    scaleStartBounds: Bounds;
-    handle: TransformHandle;
+    selection: ScaleActionSelectionState;
+    scaleStartBounds: BoundsData;
+    direction: DirectionCompass;
   }) => {
-    const {selection, scaleStartBounds, handle} = rest;
+    const {selection, scaleStartBounds, direction} = rest;
+    const bounds = Bounds.fromData(scaleStartBounds);
     const ttBounds = getTransformToolBounds({
-      startBounds: scaleStartBounds,
-      handle,
+      startBounds: bounds,
+      handle: new TransformHandle(DirectionMap.find(item => item.directionCompass === direction)!),
       mouseLocation: V(boardLocation)
     });
     const ttScale = new Vector(
-      ttBounds.width() / scaleStartBounds.width(), 
-      ttBounds.height() / scaleStartBounds.height()
+      ttBounds.getWidth() / bounds.getWidth(), 
+      ttBounds.getHeight() / bounds.getHeight()
     );
     setCards(
       updateSomeInArray(isCardInSelection(selection), card => {
@@ -175,29 +201,6 @@ export const Board: React.FC = () => {
       })
     );
   };
-
-  const {undoables, undo, redo} = useUndoableEffects<PBT>({
-    handlers: {
-      moveCards: makeUndoableFTXHandler(moveCardsHandler),
-      scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
-      addCard: makeUndoableHandler(setCards)(
-        concatArray, 
-        filterArrayById,
-      ),
-      removeCards: {
-        drdo: p => setCards(prev => prev.filter(c => !p.find(item => item.card.id === c.id))),
-        undo: p => setCards(prev => {
-          // TODO: clean this up
-          const clone = prev.slice();
-          const pSorted = p.slice().sort((a,b) => a.index - b.index);
-          pSorted.forEach(item => clone.splice(item.index, 0, item.card));
-          return clone;
-        })
-      }
-    }
-  });
-
-  const {moveCards, scaleCards, addCard, removeCards} = undoables;
 
   const startScaleCards = (handle: TransformHandle, location: Vector) => {
     uiRef.current.dragStart = location;
@@ -256,7 +259,7 @@ export const Board: React.FC = () => {
         from: uiRef.current.dragStart!,
         to: boardLocation,
         selection: selection as ScaleActionSelectionState,
-        handle: uiRef.current.scaleTransformHandle!,
+        direction: uiRef.current.scaleTransformHandle!.data.directionCompass,
         scaleStartBounds: uiRef.current.scaleStartBounds!
       })
     }
@@ -297,6 +300,32 @@ export const Board: React.FC = () => {
     uiRef.current.isMouseDownOnTransformHandle = true;
     startScaleCards(handle, new Vector(event.clientX, event.clientY));
   };
+
+  const {undoables, undo, redo, history, timeTravel} = useUndoableEffects<PBT>({
+    handlers: {
+      moveCards: makeUndoableFTXHandler(moveCardsHandler),
+      scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
+      addCard: makeUndoableHandler(setCards)(
+        concatArray, 
+        filterArrayById,
+      ),
+      removeCards: {
+        drdo: p => setCards(prev => prev.filter(c => !p.find(item => item.card.id === c.id))),
+        undo: p => setCards(prev => {
+          // TODO: clean this up
+          const clone = prev.slice();
+          const pSorted = p.slice().sort((a,b) => a.index - b.index);
+          pSorted.forEach(item => clone.splice(item.index, 0, item.card));
+          return clone;
+        })
+      }
+    }
+  });
+
+  const {moveCards, scaleCards, addCard, removeCards} = undoables;
+
+  const { branches, currentBranchId, currentPosition } = history;
+  const { stack } = branches[currentBranchId];
 
   return (
     <Root
@@ -345,6 +374,21 @@ export const Board: React.FC = () => {
           })}
         </TransformToolDiv>
       )}
+      <div style={{position: 'absolute', right: 0, top: 0, width: '600px', height: '100vh'}}>
+        {stack
+          .slice()
+          .reverse()
+          .map((action, index) => (
+            <div
+              key={action.id}
+              onClick={() => timeTravel(stack.length - 1 - index)}
+              style={{color: action.id === currentPosition.actionId ? colors.highlight : 'inherit', padding: '4px', cursor: 'pointer'}}
+            >
+              {describeAction(action)}
+            </div>
+          ))
+        }
+      </div>
     </Root>
   );
 };
@@ -354,11 +398,13 @@ const colors = {
 };
 
 const Root = styled.div`
-  /* background-color: white; */
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   outline: none;
+  font-family: Verdana, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
 `;
 
 const Card = styled.div`

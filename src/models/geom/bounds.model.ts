@@ -13,6 +13,10 @@ export type BoundsData = {
 
 export class Bounds implements IShape {
 
+  public static fromData(data: BoundsData) {
+    return new Bounds(data.left, data.top, data.right, data.bottom);
+  }
+
   public static fromRect(location: VectorData, dimensions: VectorData) {
     return new Bounds(
       location.x,
@@ -26,10 +30,10 @@ export class Bounds implements IShape {
     if (!shapes || !shapes.length) {
       return new Bounds(0, 0, 0, 0);
     }
-    const minLeft = GeomUtil.arrayMin(shapes.map(shape => shape.left()));
-    const minTop = GeomUtil.arrayMin(shapes.map(shape => shape.top()));
-    const maxRight = GeomUtil.arrayMax(shapes.map(shape => shape.right()));
-    const maxBottom = GeomUtil.arrayMax(shapes.map(shape => shape.bottom()));
+    const minLeft = GeomUtil.arrayMin(shapes.map(shape => shape.getLeft()));
+    const minTop = GeomUtil.arrayMin(shapes.map(shape => shape.getTop()));
+    const maxRight = GeomUtil.arrayMax(shapes.map(shape => shape.getRight()));
+    const maxBottom = GeomUtil.arrayMax(shapes.map(shape => shape.getBottom()));
     return new Bounds(minLeft, minTop, maxRight, maxBottom);
   }
 
@@ -45,18 +49,14 @@ export class Bounds implements IShape {
   }
 
   constructor(
-    // tslint:disable-next-line:variable-name
-    private readonly _left: number,
-    // tslint:disable-next-line:variable-name
-    private readonly _top: number,
-    // tslint:disable-next-line:variable-name
-    private readonly _right: number,
-    // tslint:disable-next-line:variable-name
-    private readonly _bottom: number) {
+    public readonly left: number,
+    public readonly top: number,
+    public readonly right: number,
+    public readonly bottom: number) {
   }
 
-  public bounds(): Bounds {
-    return new Bounds(this._left, this._top, this._right, this._bottom);
+  public getBounds(): Bounds {
+    return new Bounds(this.left, this.top, this.right, this.bottom);
   }
 
   public location(): Vector {
@@ -65,35 +65,35 @@ export class Bounds implements IShape {
   public dimensions(): Vector {
     return this.topLeft().deltaTo(this.bottomRight());
   }
-  public left(): number {
-    return this._left;
+  public getLeft(): number {
+    return this.left;
   }
-  public right(): number {
-    return this._right;
+  public getRight(): number {
+    return this.right;
   }
-  public top(): number {
-    return this._top;
+  public getTop(): number {
+    return this.top;
   }
-  public bottom(): number {
-    return this._bottom;
+  public getBottom(): number {
+    return this.bottom;
   }
-  public width(): number {
-    return this._right - this._left;
+  public getWidth(): number {
+    return this.right - this.left;
   }
-  public height(): number {
-    return this._bottom - this._top;
+  public getHeight(): number {
+    return this.bottom - this.top;
   }
   public topLeft(): Vector {
-    return new Vector(this._left, this._top);
+    return new Vector(this.left, this.top);
   }
   public topRight(): Vector {
-    return new Vector(this._right, this._top);
+    return new Vector(this.right, this.top);
   }
   public bottomRight(): Vector {
-    return new Vector(this._right, this._bottom);
+    return new Vector(this.right, this.bottom);
   }
   public bottomLeft(): Vector {
-    return new Vector(this._left, this._bottom);
+    return new Vector(this.left, this.bottom);
   }
   public leftEdge(): Segment {
     return new Segment(this.topLeft(), this.bottomLeft());
@@ -119,9 +119,9 @@ export class Bounds implements IShape {
   }
   public containsPoint(point: Vector): boolean {
     // TODO: use GeomUtil.equals?
-    return !(point.x < this._left || point.x > this._right || point.y < this._top || point.y > this._bottom);
+    return !(point.x < this.left || point.x > this.right || point.y < this.top || point.y > this.bottom);
   }
   public intersectsBounds(b: Bounds): boolean {
-    return !(this._left > b._right || this._right < b._left || this._top > b._bottom || this._bottom < b._top);
+    return !(this.left > b.right || this.right < b.left || this.top > b.bottom || this.bottom < b.top);
   }
 }

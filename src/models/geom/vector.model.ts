@@ -190,6 +190,10 @@ export class Vector {
   public equals(v2: Vector): boolean {
     return GeomUtil.equals(this.x, v2.x) && GeomUtil.equals(this.y, v2.y);
   }
+  public toRoundedString() {
+    const r = this.round();
+    return `[${r.x}, ${r.y}]`;
+  }
 }
 
 export const V = Vector.fromData;
