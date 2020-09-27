@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { VectorData, Vector, V } from "../models/geom/vector.model";
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { CardData, createNewCard } from "../models/card";
 import {
   handleSelection,
@@ -27,6 +27,8 @@ import { HistoryItemUnion, makeUndoableHandler, useUndoableEffects } from "use-f
 import { makeUndoableFTXHandler } from "../util/action-util";
 import { getTransformToolBounds } from "./transform-tool/transform.util";
 import { DirectionCompass, DirectionMap } from "../models/geom/direction.enum";
+import { ActionList } from "./ufu/action-list";
+import { BranchNav } from "./ufu/branch-nav";
 
 interface MovePayload {
   selection: MoveActionSelectionState;
@@ -301,7 +303,7 @@ export const Board: React.FC = () => {
     startScaleCards(handle, new Vector(event.clientX, event.clientY));
   };
 
-  const {undoables, undo, redo, history, timeTravel} = useUndoableEffects<PBT>({
+  const {undoables, undo, redo, history, timeTravel, switchToBranch} = useUndoableEffects<PBT>({
     handlers: {
       moveCards: makeUndoableFTXHandler(moveCardsHandler),
       scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
@@ -324,26 +326,46 @@ export const Board: React.FC = () => {
 
   const {moveCards, scaleCards, addCard, removeCards} = undoables;
 
-  const { branches, currentBranchId, currentPosition } = history;
-  const { stack } = branches[currentBranchId];
+  const [animate, setAnimate] = useState(false);
+  
+  const undoWrapped = (...args: Parameters<typeof undo>) => {
+    setAnimate(true);
+    undo(...args);
+  };
+  
+  const redoWrapped = (...args: Parameters<typeof redo>) => {
+    setAnimate(true);
+    redo(...args);
+  };
+
+  const timeTravelWrapped = (...args: Parameters<typeof timeTravel>) => {
+    setAnimate(true);
+    timeTravel(...args);
+  };
+
+  useEffect(() => {
+    setTimeout(() => setAnimate(false), 500);
+  }, [history]);
 
   return (
-    <Root
-      tabIndex={0}
-      onMouseMove={mouseMoveOnBoard}
-      onMouseDown={mouseDownOnBoard}
-      onMouseUp={mouseUpOnBoard}
-      onKeyDown={keyDownOnBoard}
-      onDoubleClick={dblclickBoard}
-    >
+    <Root>
+      <BoardArea
+        tabIndex={0}
+        onMouseMove={mouseMoveOnBoard}
+        onMouseDown={mouseDownOnBoard}
+        onMouseUp={mouseUpOnBoard}
+        onKeyDown={keyDownOnBoard}
+        onDoubleClick={dblclickBoard}
+      >
       {cards.map(card => (
         <Card
           key={card.id}
           onMouseDown={mouseDownOnCard(card)}
           style={{
             ...BoundsToRectStyle(Bounds.fromRect(card.location, card.dimensions)),
-            borderColor: isSelected(card) ? colors.highlight : "lightgray"
+            borderColor: isSelected(card) ? colors.highlight : "#aaa"
           }}
+          animate={animate}
         >
           {card.text}
         </Card>
@@ -352,7 +374,10 @@ export const Board: React.FC = () => {
         <Marquee style={BoundsToRectStyle(marqueeBounds)} />
       )}
       {hasSelection() && !uiRef.current.isDraggingCard && (
-        <TransformToolDiv style={BoundsToRectStyle(getSelectionBounds())}>
+        <TransformToolDiv 
+          animate={animate}
+          style={BoundsToRectStyle(getSelectionBounds())}
+        >
           {uiRef.current.transformTool.handles.map((handle, index) => {
             const handleStyle = {
               left: handle.getStyleLeft(),
@@ -363,6 +388,7 @@ export const Board: React.FC = () => {
             };
             return (
               <TransformToolHandle
+                animate={animate}
                 draggable={false}
                 key={index}
                 style={handleStyle}
@@ -374,42 +400,68 @@ export const Board: React.FC = () => {
           })}
         </TransformToolDiv>
       )}
-      <div style={{position: 'absolute', right: 0, top: 0, width: '600px', height: '100vh'}}>
-        {stack
-          .slice()
-          .reverse()
-          .map((action, index) => (
-            <div
-              key={action.id}
-              onClick={() => timeTravel(stack.length - 1 - index)}
-              style={{color: action.id === currentPosition.actionId ? colors.highlight : 'inherit', padding: '4px', cursor: 'pointer'}}
-            >
-              {describeAction(action)}
-            </div>
-          ))
-        }
-      </div>
+    </BoardArea>
+    <TimelineArea>
+      <BranchNav
+        history={history}
+        switchToBranch={switchToBranch}
+        undo={undoWrapped}
+        redo={redoWrapped}
+      ></BranchNav>
+      <ActionList
+        history={history}
+        switchToBranch={switchToBranch}
+        timeTravel={timeTravelWrapped}
+        describeAction={describeAction}
+      ></ActionList>
+    </TimelineArea>
     </Root>
   );
 };
 
 const colors = {
-  highlight: "#30C2FF"
+  highlight: "#48a7f6"
 };
 
 const Root = styled.div`
+  border: 1px solid #aaa;
+  position: relative;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
-  outline: none;
+  display: flex;
+  align-items: stretch;
   font-family: Verdana, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  div {
+    box-sizing: border-box;
+  }
 `;
 
-const Card = styled.div`
+const BoardArea = styled.div`
+  position: relative;
+  outline: none;
+  flex: 1;
+  overflow: hidden;
+  /* background: #f8f8f8; */
+  background: #ddd;
+`;
+
+const TimelineArea = styled.div`
+  width: 440px;
+  flex-shrink: 0;
+  border-left: 1px solid #aaa;
+  /* padding-left: 16px; */
+  /* background: #f8f8f8; */
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+`;
+
+const Card = styled.div<{animate: boolean}>`
+  /* background: #f8f8f8; */
+  background: white;
   padding: 10px;
-  background-color: white;
   position: absolute;
   overflow: hidden;
   border: 1px solid lightgray;
@@ -417,6 +469,7 @@ const Card = styled.div`
   user-select: none;
   box-sizing: border-box;
   overflow: hidden;
+  transition: ${props => props.animate ? 'all 0.3s ease-in-out' : 'none'};
 `;
 
 const Marquee = styled.div`
@@ -426,19 +479,21 @@ const Marquee = styled.div`
   pointer-events: none;
 `;
 
-const TransformToolDiv = styled.div`
+const TransformToolDiv = styled.div<{animate: boolean}>`
   position: absolute;
   box-sizing: border-box;
   pointer-events: none;
   z-index: 2;
   border: 1px solid ${colors.highlight};
+  transition: ${props => props.animate ? 'all 0.3s ease-in-out' : 'none'};
 `;
 
-const TransformToolHandle = styled.div`
+const TransformToolHandle = styled.div<{animate: boolean}>`
   pointer-events: auto;
   position: absolute;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background-color: ${colors.highlight};
+  transition: ${props => props.animate ? 'all 0.3s ease-in-out' : 'none'};
 `;
