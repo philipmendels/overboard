@@ -7,5 +7,5 @@ Example repo for using the library [use-flexible-undo](https://github.com/philip
 - scale cards
 
 <br/><br/>
-<img src="https://github.com/philipmendels/overboard/raw/master/overboard.gif"/>
+<img src="https://github.com/philipmendels/overboard/raw/master/assets/overboard.gif"/>
 <br/><br/>
