@@ -343,6 +343,11 @@ export const Board: React.FC = () => {
     timeTravel(...args);
   };
 
+  const switchToBranchWrapped = (...args: Parameters<typeof switchToBranch>) => {
+    setAnimate(true);
+    switchToBranch(...args);
+  };
+
   useEffect(() => {
     setTimeout(() => setAnimate(false), 500);
   }, [history]);
@@ -373,7 +378,7 @@ export const Board: React.FC = () => {
       {isDraggingMarquee && (
         <Marquee style={BoundsToRectStyle(marqueeBounds)} />
       )}
-      {hasSelection() && !uiRef.current.isDraggingCard && (
+      {getSelectedCards().length > 0 && !uiRef.current.isDraggingCard && (
         <TransformToolDiv 
           animate={animate}
           style={BoundsToRectStyle(getSelectionBounds())}
@@ -404,13 +409,13 @@ export const Board: React.FC = () => {
     <TimelineArea>
       <BranchNav
         history={history}
-        switchToBranch={switchToBranch}
+        switchToBranch={switchToBranchWrapped}
         undo={undoWrapped}
         redo={redoWrapped}
       ></BranchNav>
       <ActionList
         history={history}
-        switchToBranch={switchToBranch}
+        switchToBranch={switchToBranchWrapped}
         timeTravel={timeTravelWrapped}
         describeAction={describeAction}
       ></ActionList>
