@@ -1,32 +1,11 @@
-# empty-project
+Example repo for using the library [use-flexible-undo](https://github.com/philipmendels/use-flexible-undo) together with an interactive board, built from scratch in React. Work in progress.
 
-Empty project.
+- multi-select
+- add card
+- remove cards
+- move cards
+- scale cards
 
-## Building and running on localhost
-
-First install dependencies:
-
-```sh
-npm install
-```
-
-To run in hot module reloading mode:
-
-```sh
-npm start
-```
-
-To create a production build:
-
-```sh
-npm run build-prod
-```
-
-## Running
-
-Open the file `dist/index.html` in your browser
-
-## Credits
-
-Made with [createapp.dev](https://createapp.dev/)
-
+<br/><br/>
+<img src="https://github.com/philipmendels/overboard/raw/master/overboard.gif"/>
+<br/><br/>
