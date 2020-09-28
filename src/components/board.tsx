@@ -12,43 +12,33 @@ import {
   valueToKV,
   idEquals,
   concatArray,
-  BoundsToRectStyle, filterArrayById
+  BoundsToRectStyle, filterArrayById, wrapFunction
 } from "../util/util";
 import * as React from "react";
 import {
+  MoveActionItemState,
   MoveActionSelectionState,
+  ScaleActionItemState,
   ScaleActionSelectionState,
   SelectedItemsState,
 } from "../models/selection";
 import { Bounds, BoundsData } from "../models/geom/bounds.model";
 import { TransformTool } from "./transform-tool/transform-tool.model";
 import { TransformHandle } from "./transform-tool/transform-handle.model";
-import { HistoryItemUnion, makeUndoableHandler, useUndoableEffects } from "use-flexible-undo";
+import { HistoryItemUnion, makeUndoableHandler, PayloadFromTo, useUndoableEffects } from "use-flexible-undo";
 import { makeUndoableFTXHandler } from "../util/action-util";
 import { getTransformToolBounds } from "./transform-tool/transform.util";
-import { DirectionCompass, DirectionMap } from "../models/geom/direction.enum";
 import { ActionList } from "./ufu/action-list";
 import { BranchNav } from "./ufu/branch-nav";
 
-interface MovePayload {
-  selection: MoveActionSelectionState;
-  from: VectorData; 
-  // TODO: use topleft of selection bounds instead of mouse location?
-  to: VectorData;
-}
+type WithSelection<T> = { selection: T };
 
-interface ScalePayload {
-  // TODO: use selections bounds for from and to ?
-  scaleStartBounds: BoundsData;
-  direction: DirectionCompass;
-  selection: ScaleActionSelectionState;
-  from: VectorData;
-  to: VectorData;
-}
+type MovePayloadRest = WithSelection<MoveActionSelectionState>;
+type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
 
 interface PBT {
-  moveCards: MovePayload;
-  scaleCards: ScalePayload;
+  moveCards: PayloadFromTo<VectorData> & MovePayloadRest;
+  scaleCards: PayloadFromTo<BoundsData> & ScalePayloadRest;
   addCard: CardData;
   removeCards: {
     card: CardData;
@@ -61,10 +51,32 @@ type PayloadDescribers = {
 };
 
 const payloadDescribers: PayloadDescribers = {
-  moveCards: ({ from, to, selection }) => <><ActionType>Move</ActionType> {getCardsString(Object.values(selection).length)} by {V(to).subtract(V(from)).toRoundedString()}</>,
-  scaleCards: ({ selection }) => <><ActionType>Scale</ActionType> {getCardsString(Object.values(selection).length)}</>,
-  addCard: card => <><ActionType>Add</ActionType> card at {V(card.location).toRoundedString()}</>,
-  removeCards: items => <><ActionType>Remove</ActionType> {getCardsString(items.length)}</>,
+  moveCards: ({ from, to, selection }) => <>
+    <ActionType>Move</ActionType> {
+      getCardsString(Object.values(selection).length)
+    } by {
+      V(to).subtract(V(from)).toRoundedString()
+    }
+  </>,
+  scaleCards: ({ from, to, selection }) => <>
+    <ActionType>Scale</ActionType> {
+      getCardsString(Object.values(selection).length)
+    } by {
+      Bounds.fromData(to).dimensions()
+        .divideByVector(Bounds.fromData(from).dimensions())
+        .toRoundedString(2)
+    }
+  </>,
+  addCard: card => <>
+    <ActionType>Add</ActionType> card at {
+      V(card.location).toRoundedString()
+    }
+  </>,
+  removeCards: items => <>
+    <ActionType>Remove</ActionType> {
+      getCardsString(items.length)
+    }
+  </>,
 };
 
 const ActionType = styled.span`
@@ -142,10 +154,13 @@ export const Board: React.FC = () => {
       setIsDraggingMarquee(true);
       setMarqueeBounds(Bounds.fromPoints([boardLocation, start]));
     } else if (uiRef.current.isMouseDownOnTransformHandle) {
-      scaleCardsHandler(boardLocation, {
+      const ttBounds = getTransformToolBounds({
+        startBounds: Bounds.fromData(uiRef.current.scaleStartBounds!),
+        handle: uiRef.current.scaleTransformHandle!,
+        mouseLocation: V(boardLocation)
+      });
+      scaleCardsHandler(ttBounds, {
         selection: selection as ScaleActionSelectionState,
-        direction: uiRef.current.scaleTransformHandle!.data.directionCompass,
-        scaleStartBounds: uiRef.current.scaleStartBounds!
       });
     }
     event.stopPropagation();
@@ -161,63 +176,53 @@ export const Board: React.FC = () => {
     uiRef.current.dragStart = location;
     setSelection(
       updateAllInObjMap(([id, _]) => ({
-        startMoveMouseOffset: V(getCard(id)!.location).subtract(location)
-      }))
+        locationRel: V(getCard(id)!.location).subtract(location)
+      } as MoveActionItemState))
     );
   };
 
-  const moveCardsHandler = (to: VectorData, rest:{selection: MoveActionSelectionState}) => {
-    const {selection} = rest;
+  const moveCardsHandler = (to: VectorData, { selection }: MovePayloadRest) => {
     setCards(
       updateSomeInArray(isCardInSelection(selection), card => ({
         ...card,
-        location: V(to).add(selection[card.id].startMoveMouseOffset)
+        location: V(to).add(selection[card.id].locationRel)
       }))
     );
   };
 
-  const scaleCardsHandler = (boardLocation: VectorData, rest:{
-    selection: ScaleActionSelectionState;
-    scaleStartBounds: BoundsData;
-    direction: DirectionCompass;
-  }) => {
-    const {selection, scaleStartBounds, direction} = rest;
-    const bounds = Bounds.fromData(scaleStartBounds);
-    const ttBounds = getTransformToolBounds({
-      startBounds: bounds,
-      handle: new TransformHandle(DirectionMap.find(item => item.directionCompass === direction)!),
-      mouseLocation: V(boardLocation)
-    });
-    const ttScale = new Vector(
-      ttBounds.getWidth() / bounds.getWidth(), 
-      ttBounds.getHeight() / bounds.getHeight()
-    );
+  const scaleCardsHandler = (boundsData: BoundsData, { selection }: ScalePayloadRest) => {
+    const bounds = Bounds.fromData(boundsData);
+    const dimensions = bounds.dimensions();
+
     setCards(
       updateSomeInArray(isCardInSelection(selection), card => {
-        const {startScaleBoundsOffset, startScaleDimensions} = selection[card.id];
+        const {locationNorm: startScaleBoundsOffset, dimensionsNorm: startScaleDimensions} = selection[card.id];
         return {
           ...card,
-          location: ttBounds.topLeft().add(startScaleBoundsOffset.scale(ttScale)),
-          dimensions: startScaleDimensions.scale(ttScale)
+          location: bounds.topLeft().add(startScaleBoundsOffset.scale(dimensions)),
+          dimensions: startScaleDimensions.scale(dimensions)
         }
       })
     );
   };
 
   const startScaleCards = (handle: TransformHandle, location: Vector) => {
-    uiRef.current.dragStart = location;
     const selectedCardsBounds = getSelectionBounds();
 
     uiRef.current.scaleStartBounds = selectedCardsBounds;
     uiRef.current.scaleTransformHandle = handle;
 
+    const dimensions = selectedCardsBounds.dimensions();
+
     setSelection(updateAllInObjMap(([id, _]) => {
       const selectedCard = getCard(id)!;
       return {
-        startScaleBoundsOffset: V(selectedCard.location)
-          .subtract(selectedCardsBounds.topLeft()),
-        startScaleDimensions: V(selectedCard.dimensions).clone()
-      }
+        locationNorm: V(selectedCard.location)
+          .subtract(selectedCardsBounds.topLeft())
+          .divideByVector(dimensions),
+        dimensionsNorm: V(selectedCard.dimensions)
+          .divideByVector(dimensions),
+      } as ScaleActionItemState;
     }));
   };
 
@@ -258,11 +263,9 @@ export const Board: React.FC = () => {
     } else if (uiRef.current.isMouseDownOnTransformHandle) {
       uiRef.current.isMouseDownOnTransformHandle = false;
       scaleCards({
-        from: uiRef.current.dragStart!,
-        to: boardLocation,
+        from: uiRef.current.scaleStartBounds!,
+        to: getSelectionBounds(),
         selection: selection as ScaleActionSelectionState,
-        direction: uiRef.current.scaleTransformHandle!.data.directionCompass,
-        scaleStartBounds: uiRef.current.scaleStartBounds!
       })
     }
     uiRef.current.isMouseDownOnBoard = false;
@@ -326,27 +329,19 @@ export const Board: React.FC = () => {
 
   const {moveCards, scaleCards, addCard, removeCards} = undoables;
 
+  // Animation:
+
   const [animate, setAnimate] = useState(false);
-  
-  const undoWrapped = (...args: Parameters<typeof undo>) => {
-    setAnimate(true);
-    undo(...args);
-  };
-  
-  const redoWrapped = (...args: Parameters<typeof redo>) => {
-    setAnimate(true);
-    redo(...args);
-  };
 
-  const timeTravelWrapped = (...args: Parameters<typeof timeTravel>) => {
-    setAnimate(true);
-    timeTravel(...args);
-  };
+  const wrapWithAnimate = wrapFunction(() => setAnimate(true));
 
-  const switchToBranchWrapped = (...args: Parameters<typeof switchToBranch>) => {
-    setAnimate(true);
-    switchToBranch(...args);
-  };
+  const undoWithAnimation = wrapWithAnimate(undo);
+  
+  const redoWithAnimation = wrapWithAnimate(redo);
+
+  const timeTravelWithAnimation = wrapWithAnimate(timeTravel);
+
+  const switchToBranchWithAnimation = wrapWithAnimate(switchToBranch);
 
   useEffect(() => {
     setTimeout(() => setAnimate(false), 500);
@@ -409,14 +404,14 @@ export const Board: React.FC = () => {
     <TimelineArea>
       <BranchNav
         history={history}
-        switchToBranch={switchToBranchWrapped}
-        undo={undoWrapped}
-        redo={redoWrapped}
+        switchToBranch={switchToBranchWithAnimation}
+        undo={undoWithAnimation}
+        redo={redoWithAnimation}
       ></BranchNav>
       <ActionList
         history={history}
-        switchToBranch={switchToBranchWrapped}
-        timeTravel={timeTravelWrapped}
+        switchToBranch={switchToBranchWithAnimation}
+        timeTravel={timeTravelWithAnimation}
         describeAction={describeAction}
       ></ActionList>
     </TimelineArea>

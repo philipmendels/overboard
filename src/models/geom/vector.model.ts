@@ -92,6 +92,9 @@ export class Vector {
   public scale(v: Vector): Vector {
     return new Vector(this.x * v.x, this.y * v.y);
   }
+  public divideByVector(v: Vector): Vector {
+    return new Vector(this.x / v.x, this.y / v.y);
+  }
   public addLength(amount: number) {
     const length = this.dist();
     const factor = (length + amount) / length;
@@ -103,8 +106,12 @@ export class Vector {
   public abs(): Vector {
     return new Vector(Math.abs(this.x), Math.abs(this.y));
   }
-  public round(): Vector {
-    return new Vector(Math.round(this.x), Math.round(this.y));
+  public round(decimals = 0): Vector {
+    if (decimals === 0) {
+      return new Vector(Math.round(this.x), Math.round(this.y));
+    }
+    const factor = Math.pow(10, decimals);
+    return new Vector(Math.round(this.x * factor) / factor, Math.round(this.y * factor) / factor);
   }
   public dot(v2: Vector): number {
     return this.x * v2.x + this.y * v2.y;
@@ -190,8 +197,8 @@ export class Vector {
   public equals(v2: Vector): boolean {
     return GeomUtil.equals(this.x, v2.x) && GeomUtil.equals(this.y, v2.y);
   }
-  public toRoundedString() {
-    const r = this.round();
+  public toRoundedString(decimals = 0) {
+    const r = this.round(decimals);
     return `[${r.x}, ${r.y}]`;
   }
 }

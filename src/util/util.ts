@@ -170,6 +170,14 @@ export const handleSelection = (
   }
 };
 
+
+type Fn = (...args: any[]) => any;
+
+export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (...args: Parameters<F>) =>{
+  callback();
+  fn(...args);
+}
+
 export const px = (v: string | number) => v + "px";
 
 export const BoundsToCSS = (bounds: Bounds) => css`
