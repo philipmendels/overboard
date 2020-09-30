@@ -12,7 +12,7 @@ import {
   valueToKV,
   idEquals,
   concatArray,
-  BoundsToRectStyle, filterArrayById, wrapFunction
+  BoundsToRectStyle, filterArrayById, wrapFunction, isItemSelected
 } from "../util/util";
 import * as React from "react";
 import {
@@ -97,32 +97,26 @@ const initialCards: CardData[] = [
 
 const initialSelection: SelectedItemsState = {};
 
+type DragType = 'NONE' | 'CARDS' | 'MARQUEE' | 'TRANSFORM_HANDLE';
+
+const transformTool = new TransformTool();
+
 export const Board: React.FC = () => {
+
   const [cards, setCards] = useState(initialCards);
   const [selection, setSelection] = useState(initialSelection);
-  const [isDraggingMarquee, setIsDraggingMarquee] = useState(false);
-  const [marqueeBounds, setMarqueeBounds] = useState(new Bounds(0, 0, 0, 0));
 
-  const uiRef = useRef({
-    isDraggingCard: false,
-    isMouseDownOnBoard: false,
-    isMouseDownOnCard: false,
-    dragStart: null as Vector | null,
-    marqueeStartLocation: null as Vector | null,
-    transformTool: new TransformTool(),
-    isMouseDownOnTransformHandle: false,
-    scaleStartBounds: null as Bounds | null,
-    scaleTransformHandle: null as TransformHandle | null,
-  });
+  const [dragType, setDragType] = useState<DragType>('NONE');
+  const [dragStartLocation, setDragStartLocation] = useState<Vector | null>(null);
+  const [dragLocation, setDragLocation] = useState<Vector | null>(null);
+  const getIsDragging = () => dragLocation !== null;
 
-  const getCard = (id: string) => cards.find(idEquals(id));
-  const isCardInSelection = (selection: SelectedItemsState) => (
-    card: CardData
-  ) => selection[card.id] !== undefined;
-  const isSelected = isCardInSelection(selection);
-  const getCardsInSelection = (selection: SelectedItemsState) =>
-    cards.filter(isCardInSelection(selection));
-  const getSelectedCards = () => getCardsInSelection(selection);
+  const [activeTransformHandle, setActiveTransformHandle] = useState<TransformHandle | null>(null);
+  const [scaleStartBounds, setScaleStartBounds] = useState<Bounds | null>(null);
+
+  const getCardById = (id: string) => cards.find(idEquals(id));
+  const isSelected = isItemSelected(selection);
+  const getSelectedCards = () => cards.filter(isSelected);
   const clearSelection = () => setSelection(initialSelection);
   const hasSelection = () => Boolean(Object.keys(selection).length);
   const selectCards = (ids: string[]) => {
@@ -132,58 +126,20 @@ export const Board: React.FC = () => {
     setSelection(filterObjMap(keyEqualsNot(id)));
   };
 
-  const mouseDownOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    if (hasSelection()) {
-      clearSelection();
-    }
-    uiRef.current.isMouseDownOnBoard = true;
-
-    uiRef.current.marqueeStartLocation = new Vector(
-      event.clientX,
-      event.clientY
+  const getSelectionBounds = (): Bounds => {
+    const selectedCardsBoundsArray = getSelectedCards().map(card =>
+      Bounds.fromRect(card.location, card.dimensions)
     );
+    return Bounds.fromShapes(selectedCardsBoundsArray);
   };
 
-  const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
-    if (uiRef.current.isMouseDownOnCard) {
-      uiRef.current.isDraggingCard = true;
-      moveCardsHandler(boardLocation, {selection: selection as MoveActionSelectionState});
-    } else if (uiRef.current.isMouseDownOnBoard) {
-      const start = uiRef.current.marqueeStartLocation!;
-      setIsDraggingMarquee(true);
-      setMarqueeBounds(Bounds.fromPoints([boardLocation, start]));
-    } else if (uiRef.current.isMouseDownOnTransformHandle) {
-      const ttBounds = getTransformToolBounds({
-        startBounds: Bounds.fromData(uiRef.current.scaleStartBounds!),
-        handle: uiRef.current.scaleTransformHandle!,
-        mouseLocation: V(boardLocation)
-      });
-      scaleCardsHandler(ttBounds, {
-        selection: selection as ScaleActionSelectionState,
-      });
-    }
-    event.stopPropagation();
-  };
+  const getMarqueeBounds = () => dragLocation && dragStartLocation && Bounds.fromPoints([dragLocation, dragStartLocation]);
 
-  const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    addCard(createNewCard(
-      new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
-    ));
-  };
-
-  const startMoveCards = (location: Vector) => {
-    uiRef.current.dragStart = location;
-    setSelection(
-      updateAllInObjMap(([id, _]) => ({
-        locationRel: V(getCard(id)!.location).subtract(location)
-      } as MoveActionItemState))
-    );
-  };
-
+  // handlers
+  
   const moveCardsHandler = (to: VectorData, { selection }: MovePayloadRest) => {
     setCards(
-      updateSomeInArray(isCardInSelection(selection), card => ({
+      updateSomeInArray(isItemSelected(selection), card => ({
         ...card,
         location: V(to).add(selection[card.id].locationRel)
       }))
@@ -195,117 +151,17 @@ export const Board: React.FC = () => {
     const dimensions = bounds.dimensions();
 
     setCards(
-      updateSomeInArray(isCardInSelection(selection), card => {
-        const {locationNorm: startScaleBoundsOffset, dimensionsNorm: startScaleDimensions} = selection[card.id];
+      updateSomeInArray(isItemSelected(selection), card => {
+        const {locationNorm, dimensionsNorm} = selection[card.id];
         return {
           ...card,
-          location: bounds.topLeft().add(startScaleBoundsOffset.scale(dimensions)),
-          dimensions: startScaleDimensions.scale(dimensions)
+          location: bounds.topLeft().add(locationNorm.scale(dimensions)),
+          dimensions: dimensionsNorm.scale(dimensions)
         }
       })
     );
   };
-
-  const startScaleCards = (handle: TransformHandle, location: Vector) => {
-    const selectedCardsBounds = getSelectionBounds();
-
-    uiRef.current.scaleStartBounds = selectedCardsBounds;
-    uiRef.current.scaleTransformHandle = handle;
-
-    const dimensions = selectedCardsBounds.dimensions();
-
-    setSelection(updateAllInObjMap(([id, _]) => {
-      const selectedCard = getCard(id)!;
-      return {
-        locationNorm: V(selectedCard.location)
-          .subtract(selectedCardsBounds.topLeft())
-          .divideByVector(dimensions),
-        dimensionsNorm: V(selectedCard.dimensions)
-          .divideByVector(dimensions),
-      } as ScaleActionItemState;
-    }));
-  };
-
-  const mouseDownOnCard = (mouseDownCard: CardData) => (
-    event: React.MouseEvent<HTMLDivElement>
-  ): void => {
-    event.stopPropagation();
-    uiRef.current.isMouseDownOnCard = true;
-    handleSelection(
-      event,
-      isSelected(mouseDownCard),
-      clearSelection,
-      () => selectCards([mouseDownCard.id]),
-      () => deselectCard(mouseDownCard.id)
-    );
-    startMoveCards(V({ x: event.clientX, y: event.clientY }));
-  };
-
-  const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
-    if (isDraggingMarquee) {
-      const cardIdsToSelect = cards
-        .filter(card => {
-          const cardBounds = Bounds.fromRect(card.location, card.dimensions);
-          return cardBounds.intersectsBounds(marqueeBounds);
-        })
-        .map(card => card.id);
-      if (cardIdsToSelect.length) {
-        selectCards(cardIdsToSelect);
-      }
-    } else if (uiRef.current.isDraggingCard) {
-      uiRef.current.isDraggingCard = false;
-      moveCards({
-        selection: selection as MoveActionSelectionState,
-        from: uiRef.current.dragStart!,
-        to: boardLocation
-      });
-    } else if (uiRef.current.isMouseDownOnTransformHandle) {
-      uiRef.current.isMouseDownOnTransformHandle = false;
-      scaleCards({
-        from: uiRef.current.scaleStartBounds!,
-        to: getSelectionBounds(),
-        selection: selection as ScaleActionSelectionState,
-      })
-    }
-    uiRef.current.isMouseDownOnBoard = false;
-    uiRef.current.isMouseDownOnCard = false;
-    uiRef.current.isDraggingCard = false;
-    setIsDraggingMarquee(false);
-  };
-
-  const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.keyCode === 8 || event.keyCode === 46) {
-      // backspace and delete
-      removeCards(getSelectedCards().map(card => ({
-        card,
-        index: cards.findIndex(idEquals(card.id))
-      })));
-    }
-    if(event.key  === 'ArrowDown') {
-      undo();
-    }
-    if(event.key  === 'ArrowUp') {
-      redo();
-    }
-  };
-
-  const getSelectionBounds = (): Bounds => {
-    const selectedCardsBoundsArray = getSelectedCards().map(card =>
-      Bounds.fromRect(card.location, card.dimensions)
-    );
-    return Bounds.fromShapes(selectedCardsBoundsArray);
-  };
-
-  const mouseDownOnHandle = (
-    event: React.MouseEvent<HTMLDivElement>,
-    handle: TransformHandle
-  ) => {
-    event.stopPropagation();
-    uiRef.current.isMouseDownOnTransformHandle = true;
-    startScaleCards(handle, new Vector(event.clientX, event.clientY));
-  };
-
+  
   const {undoables, undo, redo, history, timeTravel, switchToBranch} = useUndoableEffects<PBT>({
     handlers: {
       moveCards: makeUndoableFTXHandler(moveCardsHandler),
@@ -346,6 +202,141 @@ export const Board: React.FC = () => {
   useEffect(() => {
     setTimeout(() => setAnimate(false), 500);
   }, [history]);
+  
+  // UI events
+
+  const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
+    addCard(createNewCard(
+      new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
+    ));
+  };
+
+  const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.keyCode === 8 || event.keyCode === 46) {
+      // backspace and delete
+      removeCards(getSelectedCards().map(card => ({
+        card,
+        index: cards.findIndex(idEquals(card.id))
+      })));
+    }
+    if(event.key  === 'ArrowDown') {
+      undo();
+    }
+    if(event.key  === 'ArrowUp') {
+      redo();
+    }
+  };
+
+  const mouseDownOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
+    if (hasSelection()) {
+      clearSelection();
+    }
+    setDragType('MARQUEE');
+
+    setDragStartLocation(new Vector(
+      event.clientX,
+      event.clientY
+    ));
+  };
+
+  const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
+    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
+    if(dragType !== 'NONE') {
+      setDragLocation(V(boardLocation));
+    }
+    if (dragType === 'CARDS') {
+      moveCardsHandler(boardLocation, {selection: selection as MoveActionSelectionState});
+    } else if (dragType === 'TRANSFORM_HANDLE') {
+      const ttBounds = getTransformToolBounds({
+        startBounds: scaleStartBounds!,
+        handle: activeTransformHandle!,
+        mouseLocation: V(boardLocation)
+      });
+      scaleCardsHandler(ttBounds, {
+        selection: selection as ScaleActionSelectionState,
+      });
+    }
+    event.stopPropagation();
+  };
+
+  const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
+    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
+    if(getIsDragging()) {
+      if (dragType === 'MARQUEE') {
+        const mb = getMarqueeBounds()!;
+        const cardIdsToSelect = cards
+          .filter(card => {
+            const cardBounds = Bounds.fromRect(card.location, card.dimensions);
+            return cardBounds.intersectsBounds(mb);
+          })
+          .map(card => card.id);
+        if (cardIdsToSelect.length) {
+          selectCards(cardIdsToSelect);
+        }
+      } else if (dragType === 'CARDS') {
+        moveCards({
+          selection: selection as MoveActionSelectionState,
+          from: dragStartLocation!,
+          to: boardLocation
+        });
+      } else if (dragType === 'TRANSFORM_HANDLE') {
+        scaleCards({
+          from: scaleStartBounds!,
+          to: getSelectionBounds(),
+          selection: selection as ScaleActionSelectionState,
+        })
+      }
+    }
+    setDragType('NONE');
+    setDragLocation(null);
+  };
+  
+  const mouseDownOnCard = (mouseDownCard: CardData) => (
+    event: React.MouseEvent<HTMLDivElement>
+  ): void => {
+    event.stopPropagation();
+    const loc = new Vector(event.clientX, event.clientY);
+    setDragStartLocation(loc)
+    setDragType('CARDS');
+    handleSelection(
+      event,
+      isSelected(mouseDownCard),
+      clearSelection,
+      () => selectCards([mouseDownCard.id]),
+      () => deselectCard(mouseDownCard.id)
+    );
+    setSelection(
+      updateAllInObjMap(([id, _]) => ({
+        locationRel: V(getCardById(id)!.location).subtract(loc)
+      } as MoveActionItemState))
+    );
+  };
+
+  const mouseDownOnHandle = (
+    event: React.MouseEvent<HTMLDivElement>,
+    handle: TransformHandle
+  ) => {
+    event.stopPropagation();
+    setDragType('TRANSFORM_HANDLE');
+
+    const selectedCardsBounds = getSelectionBounds();
+
+    setScaleStartBounds(selectedCardsBounds);
+    setActiveTransformHandle(handle);
+
+    const dimensions = selectedCardsBounds.dimensions();
+
+    setSelection(updateAllInObjMap(([id, _]) => {
+      const selectedCard = getCardById(id)!;
+      return {
+        locationNorm: V(selectedCard.location)
+          .subtract(selectedCardsBounds.topLeft())
+          .divideByVector(dimensions),
+        dimensionsNorm: V(selectedCard.dimensions)
+          .divideByVector(dimensions),
+      } as ScaleActionItemState;
+    }));
+  };
 
   return (
     <Root>
@@ -370,15 +361,15 @@ export const Board: React.FC = () => {
           {card.text}
         </Card>
       ))}
-      {isDraggingMarquee && (
-        <Marquee style={BoundsToRectStyle(marqueeBounds)} />
+      {getIsDragging() && dragType === 'MARQUEE' && (
+        <Marquee style={BoundsToRectStyle(getMarqueeBounds()!)} />
       )}
-      {getSelectedCards().length > 0 && !uiRef.current.isDraggingCard && (
+      {getSelectedCards().length > 0 && !(getIsDragging() && dragType === 'CARDS') && (
         <TransformToolDiv 
           animate={animate}
           style={BoundsToRectStyle(getSelectionBounds())}
         >
-          {uiRef.current.transformTool.handles.map((handle, index) => {
+          {transformTool.handles.map((handle, index) => {
             const handleStyle = {
               left: handle.getStyleLeft(),
               top: handle.getStyleTop(),

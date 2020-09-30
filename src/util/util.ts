@@ -178,6 +178,10 @@ export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (...args:
   fn(...args);
 }
 
+export const isItemSelected = (selection: Record<string, any>) => <T extends ObjWithId>(
+  item: T
+) => selection[item.id] !== undefined;
+
 export const px = (v: string | number) => v + "px";
 
 export const BoundsToCSS = (bounds: Bounds) => css`
