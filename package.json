@@ -29,8 +29,19 @@
     "@types/react": "^16.9.49",
     "@types/react-dom": "^16.9.8",
     "@types/uuid": "^3.4.9",
+    "@typescript-eslint/eslint-plugin": "^4.3.0",
+    "@typescript-eslint/parser": "^4.3.0",
+    "eslint-config-prettier": "^6.12.0",
+    "eslint-plugin-react-hooks": "^4.1.2",
     "parcel-bundler": "^1.12.4",
-    "prettier": "^1.19.1",
+    "prettier": "2.1.2",
     "typescript": "^3.9.7"
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "arrowParens": "avoid"
   }
 }
