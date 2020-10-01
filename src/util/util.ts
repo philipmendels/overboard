@@ -1,5 +1,5 @@
-import { Bounds } from "../models/geom/bounds.model";
-import { css } from "@emotion/core";
+import { Bounds } from '../models/geom/bounds.model';
+import { css } from '@emotion/core';
 
 type ObjMap<V> = Record<string, V>;
 
@@ -14,7 +14,8 @@ interface ObjWithId {
 
 const valueEquals = <V>(v: V) => (v: V) => v === v;
 export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
-export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj:O) => obj.id !== id;
+export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj: O) =>
+  obj.id !== id;
 const keyEquals = <K, V>(key: K) => ([k, _]: [K, V]) => key === k;
 export const keyEqualsNot = <K, V>(key: K) => ([k, _]: [K, V]) => key !== k;
 
@@ -24,7 +25,7 @@ export const merge = <V extends object>(
   partial: Partial<V>
 ): Updater<V> => object => ({
   ...object,
-  ...partial
+  ...partial,
 });
 
 export const mergeKV = <K, V extends object>(
@@ -33,8 +34,8 @@ export const mergeKV = <K, V extends object>(
   k,
   {
     ...v,
-    ...partial
-  }
+    ...partial,
+  },
 ];
 
 const getKVUpdater = <K, V>(
@@ -71,8 +72,23 @@ export const filterArray = <V>(
   filter: Selector<V>
 ): Updater<Array<V>> => array => array.filter(filter);
 
-export const filterArrayById = <O extends ObjWithId>(item: O) => filterArray(idEqualsNot(item.id))
+export const filterArrayById = <O extends ObjWithId>(item: O) =>
+  filterArray(idEqualsNot(item.id));
+export const filterArrayByIds = <O extends ObjWithId>(items: O[]) =>
+  filterArray<O>(item => !items.find(idEquals(item.id)));
 
+export const addByIndex = <T>(list: { index: number; element: T }[]) => (
+  prev: T[]
+) => {
+  const clone = prev.slice();
+  const pSorted = list.slice().sort((a, b) => a.index - b.index);
+  pSorted.forEach(item => clone.splice(item.index, 0, item.element));
+  return clone;
+};
+
+export const addByIndexMapped = <P, T>(
+  mapFn: (item: P) => { index: number; element: T }
+) => (payload: P[]) => addByIndex(payload.map(mapFn));
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
  * function that takes an object and returns a shallow copy for which
@@ -170,19 +186,22 @@ export const handleSelection = (
   }
 };
 
-
 type Fn = (...args: any[]) => any;
 
-export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (...args: Parameters<F>) =>{
+export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (
+  ...args: Parameters<F>
+) => {
   callback();
   fn(...args);
-}
+};
 
-export const isItemSelected = (selection: Record<string, any>) => <T extends ObjWithId>(
+export const isItemSelected = (selection: Record<string, any>) => <
+  T extends ObjWithId
+>(
   item: T
 ) => selection[item.id] !== undefined;
 
-export const px = (v: string | number) => v + "px";
+export const px = (v: string | number) => v + 'px';
 
 export const BoundsToCSS = (bounds: Bounds) => css`
   left: ${bounds.getLeft()}px;
@@ -192,15 +211,15 @@ export const BoundsToCSS = (bounds: Bounds) => css`
 `;
 
 export const BoundsToRectStyle = (bounds: Bounds) => ({
-  left: bounds.getLeft() + "px",
-  top: bounds.getTop() + "px",
-  width: bounds.getWidth() + "px",
-  height: bounds.getHeight() + "px"
+  left: bounds.getLeft() + 'px',
+  top: bounds.getTop() + 'px',
+  width: bounds.getWidth() + 'px',
+  height: bounds.getHeight() + 'px',
 });
 
 export const BoundsToBoundsStyle = (bounds: Bounds) => ({
-  left: bounds.getLeft() + "px",
-  top: bounds.getTop() + "px",
-  right: bounds.getRight() + "px",
-  bottom: bounds.getBottom() + "px"
+  left: bounds.getLeft() + 'px',
+  top: bounds.getTop() + 'px',
+  right: bounds.getRight() + 'px',
+  bottom: bounds.getBottom() + 'px',
 });
