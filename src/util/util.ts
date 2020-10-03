@@ -12,12 +12,15 @@ interface ObjWithId {
   [key: string]: any;
 }
 
-const valueEquals = <V>(v: V) => (v: V) => v === v;
+export const notEquals = <V>(v: V) => (v: V) => v !== v;
+export const valueEquals = <V>(v: V) => (v: V) => v === v;
 export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
 export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj: O) =>
   obj.id !== id;
 const keyEquals = <K, V>(key: K) => ([k, _]: [K, V]) => key === k;
 export const keyEqualsNot = <K, V>(key: K) => ([k, _]: [K, V]) => key !== k;
+export const keyNotIncluded = <K, V>(keys: K[]) => ([k, _]: [K, V]) =>
+  !keys.includes(k);
 
 export const valueToKV = <K, V>(v: V) => (k: K) => [k, v] as [K, V];
 
@@ -68,9 +71,15 @@ export const mapArray = <V>(mapFn: Updater<V>): Updater<V[]> => array =>
 export const concatArray = <V>(arrayOrValue: V[] | V): Updater<V[]> => arr =>
   arr.concat(arrayOrValue);
 
+export const concatSet = <V>(arrayOrValue: V[] | V): Updater<Set<V>> => prev =>
+  new Set([...prev].concat(arrayOrValue));
+
 export const filterArray = <V>(
   filter: Selector<V>
 ): Updater<Array<V>> => array => array.filter(filter);
+
+export const filterSet = <V>(filter: Selector<V>): Updater<Set<V>> => prev =>
+  new Set([...prev].filter(filter));
 
 export const filterArrayById = <O extends ObjWithId>(item: O) =>
   filterArray(idEqualsNot(item.id));
@@ -85,6 +94,15 @@ export const addByIndex = <T>(list: { index: number; element: T }[]) => (
   pSorted.forEach(item => clone.splice(item.index, 0, item.element));
   return clone;
 };
+
+export const reduceSelection = <T>(
+  selection: string[],
+  fn: (id: string) => T
+) =>
+  selection.reduce<Record<string, T>>((acc, id) => {
+    acc[id] = fn(id);
+    return acc;
+  }, {});
 
 export const addByIndexMapped = <P, T>(
   mapFn: (item: P) => { index: number; element: T }
@@ -125,6 +143,17 @@ export const mapObjMap = <V>(
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(Object.entries(objMap).map(updater));
 
+export const mapObjMap2 = <O extends object, O2 extends Object>(
+  mapFn: (e: Entry<O>) => Entry<O2>
+) => (objMap: O) => fromEntries(toEntries(objMap).map(mapFn));
+
+export const mapObjMapValues = <O extends object, O2 extends Object>(
+  mapFn: (e: Entry<O>) => ValueOf<O2>
+) => (objMap: O) =>
+  fromEntries(
+    toEntries(objMap).map(([k, v]) => [k as keyof O2, mapFn([k, v])])
+  );
+
 export const filterObjMap = <V>(
   filter: Selector<[string, V]>
 ): Updater<ObjMap<V>> => objMap =>
@@ -135,6 +164,22 @@ export const addToObjMap = <V>(
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(Object.entries(objMap).concat(entryOrEntries));
 
+export type Entry<O extends Object> = { [K in keyof O]: [K, O[K]] }[keyof O];
+export type ValueOf<T> = T[keyof T];
+
+export const concatObjMapEntries = <O extends object>(entries: Entry<O>[]) => (
+  o: O
+) => fromEntries(toEntries(o).concat(entries));
+
+export const filterObjMapEntries = <O extends object>(
+  filter: Selector<Entry<O>>
+) => (objMap: O) => fromEntries(toEntries(objMap).filter(filter));
+
+const toEntries = <O extends object>(obj: O) =>
+  Object.entries(obj) as Entry<O>[];
+
+const fromEntries = <O extends object>(entries: Entry<O>[]) =>
+  Object.fromEntries(entries) as O;
 /**
  * Curried function that takes a selector fn (A) and updater fn (B), and returns a
  * function that takes a Map and returns a shallow copy for which
@@ -195,7 +240,17 @@ export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (
   fn(...args);
 };
 
-export const isItemSelected = (selection: Record<string, any>) => <
+export const isItemInSelectionSet = (selection: Set<string>) => <
+  T extends ObjWithId
+>(
+  item: T
+) => selection.has(item.id);
+
+export const isItemSelected = (selection: string[]) => <T extends ObjWithId>(
+  item: T
+) => selection.includes(item.id);
+
+export const isItemInSelectionRecord = (selection: Record<string, any>) => <
   T extends ObjWithId
 >(
   item: T

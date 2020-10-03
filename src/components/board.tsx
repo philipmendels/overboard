@@ -8,9 +8,14 @@ import {
   concatArray,
   filterArrayById,
   wrapFunction,
-  isItemSelected,
-  filterArray,
-  filterArrayByIds,, addByIndex
+  filterArrayByIds,
+  addByIndex,
+  isItemInSelectionRecord,
+  concatObjMapEntries,
+  filterObjMapEntries,
+  Entry,
+  ValueOf,
+  mapObjMapValues,
 } from '../util/util';
 import { Bounds } from '../models/geom/bounds.model';
 import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
@@ -20,6 +25,7 @@ import { BranchNav } from './ufu/branch-nav';
 import { PBT, MoveCardsHandler, ScaleCardsHandler } from '../models/actions';
 import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
+import { SelectionState } from '../models/selection';
 
 const initialCards: CardData[] = [
   createNewCard(new Vector(200, 400)),
@@ -28,10 +34,27 @@ const initialCards: CardData[] = [
 
 export const Board: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
+  const [selection, setSelection] = useState<SelectionState>({});
+
+  const clearSelection = () => setSelection({});
+
+  const select = (ids: string[]) => {
+    setSelection(concatObjMapEntries(ids.map(id => [id, null])));
+  };
+
+  const deselect = (ids: string[]) => {
+    setSelection(filterObjMapEntries(([id]) => !ids.includes(id)));
+  };
+
+  const mapSelection = <O2 extends SelectionState>(
+    mapFn: (entry: Entry<SelectionState>) => ValueOf<O2>
+  ) => {
+    setSelection(mapObjMapValues(mapFn));
+  };
 
   const moveCardsHandler: MoveCardsHandler = (to, { selection }) => {
     setCards(
-      updateSomeInArray(isItemSelected(selection), card => ({
+      updateSomeInArray(isItemInSelectionRecord(selection), card => ({
         ...card,
         location: V(to).add(selection[card.id].locationRel),
       }))
@@ -43,7 +66,7 @@ export const Board: React.FC = () => {
     const dimensions = bounds.dimensions();
 
     setCards(
-      updateSomeInArray(isItemSelected(selection), card => {
+      updateSomeInArray(isItemInSelectionRecord(selection), card => {
         const { locationNorm, dimensionsNorm } = selection[card.id];
         return {
           ...card,
@@ -67,8 +90,11 @@ export const Board: React.FC = () => {
       scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
       addCard: makeUndoableHandler(setCards)(concatArray, filterArrayById),
       removeCards: makeUndoableHandler(setCards)(
-        payload => filterArrayByIds(payload.map(({card}) => card)),
-        payload => addByIndex(payload.map(({index, card}) => ({index, element: card})))
+        payload => filterArrayByIds(payload.map(({ card }) => card)),
+        payload =>
+          addByIndex(
+            payload.map(({ index, card }) => ({ index, element: card }))
+          )
       ),
     },
   });
@@ -97,6 +123,11 @@ export const Board: React.FC = () => {
         moveCardsHandler={moveCardsHandler}
         scaleCardsHandler={scaleCardsHandler}
         animate={animate}
+        selection={selection}
+        clearSelection={clearSelection}
+        select={select}
+        deselect={deselect}
+        mapSelection={mapSelection}
       ></Canvas>
       <TimelineArea>
         <BranchNav

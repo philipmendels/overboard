@@ -1,16 +1,19 @@
-import { Vector } from "./geom/vector.model";
+import { Vector } from './geom/vector.model';
 
-export type SelectedItemsState = Record<string, SelectedItem>;
-export type SelectedItem = {} | MoveActionItemState | ScaleActionItemState;
-
-export type MoveActionItemState = {
+interface MoveActionItemState {
   locationRel: Vector;
-};
+}
 
-export type ScaleActionItemState = {
+interface ScaleActionItemState {
   locationNorm: Vector;
   dimensionsNorm: Vector;
-};
+}
 
+export type StandardSelectionState = Record<string, null>;
 export type MoveActionSelectionState = Record<string, MoveActionItemState>;
 export type ScaleActionSelectionState = Record<string, ScaleActionItemState>;
+
+export type SelectionState =
+  | StandardSelectionState
+  | MoveActionSelectionState
+  | ScaleActionSelectionState;
