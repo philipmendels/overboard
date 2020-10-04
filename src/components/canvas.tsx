@@ -239,6 +239,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             ...BoundsToRectStyle(
               Bounds.fromRect(card.location, card.dimensions)
             ),
+            // transform: `translate(${card.location.x}px, ${card.location.y}px)`,
             borderColor: isSelected(card) ? colors.highlight : '#aaa',
           }}
           animate={animate}

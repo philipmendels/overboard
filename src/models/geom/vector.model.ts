@@ -1,4 +1,4 @@
-import * as GeomUtil from "./geom.util";
+import * as GeomUtil from './geom.util';
 
 export type VectorData = {
   x: number;
@@ -55,7 +55,7 @@ export class Vector {
   public toData(): VectorData {
     return {
       x: this.x,
-      y: this.y
+      y: this.y,
     };
   }
 
@@ -103,6 +103,9 @@ export class Vector {
   public subtractLength(amount: number) {
     return this.addLength(-amount);
   }
+  public max(v: Vector): Vector {
+    return new Vector(Math.max(this.x, v.x), Math.max(this.y, v.y));
+  }
   public abs(): Vector {
     return new Vector(Math.abs(this.x), Math.abs(this.y));
   }
@@ -111,7 +114,10 @@ export class Vector {
       return new Vector(Math.round(this.x), Math.round(this.y));
     }
     const factor = Math.pow(10, decimals);
-    return new Vector(Math.round(this.x * factor) / factor, Math.round(this.y * factor) / factor);
+    return new Vector(
+      Math.round(this.x * factor) / factor,
+      Math.round(this.y * factor) / factor
+    );
   }
   public dot(v2: Vector): number {
     return this.x * v2.x + this.y * v2.y;

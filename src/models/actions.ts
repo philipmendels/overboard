@@ -1,8 +1,11 @@
-import { PayloadFromTo } from "use-flexible-undo";
-import { CardData } from "./card";
-import { BoundsData } from "./geom/bounds.model";
-import { VectorData } from "./geom/vector.model";
-import { MoveActionSelectionState, ScaleActionSelectionState } from "./selection";
+import { PayloadFromTo } from 'use-flexible-undo';
+import { CardData } from './card';
+import { BoundsData } from './geom/bounds.model';
+import { VectorData } from './geom/vector.model';
+import {
+  MoveActionSelectionState,
+  ScaleActionSelectionState,
+} from './selection';
 
 type WithSelection<T> = { selection: T };
 
@@ -16,8 +19,15 @@ export interface PBT {
   removeCards: {
     card: CardData;
     index: number;
-  }[]
+  }[];
+  reorderCard: PayloadFromTo<number> & { id: string };
 }
 
-export type MoveCardsHandler = (to: VectorData, { selection }: MovePayloadRest) => void;
-export type ScaleCardsHandler = (boundsData: BoundsData, { selection }: ScalePayloadRest) => void;
+export type MoveCardsHandler = (
+  to: VectorData,
+  { selection }: MovePayloadRest
+) => void;
+export type ScaleCardsHandler = (
+  boundsData: BoundsData,
+  { selection }: ScalePayloadRest
+) => void;

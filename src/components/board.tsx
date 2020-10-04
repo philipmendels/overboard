@@ -2,7 +2,7 @@ import * as React from 'react';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
 import { useEffect, useState } from 'react';
-import { CardData, createNewCard } from '../models/card';
+import { CardData, createNewCard, minCardSize } from '../models/card';
 import {
   updateSomeInArray,
   concatArray,
@@ -16,6 +16,7 @@ import {
   Entry,
   ValueOf,
   mapObjMapValues,
+  idEquals,
 } from '../util/util';
 import { Bounds } from '../models/geom/bounds.model';
 import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
@@ -25,12 +26,16 @@ import { BranchNav } from './ufu/branch-nav';
 import { PBT, MoveCardsHandler, ScaleCardsHandler } from '../models/actions';
 import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
-import { SelectionState } from '../models/selection';
+import { SelectionProps, SelectionState } from '../models/selection';
+import { Layers } from './layers/layers';
 
-const initialCards: CardData[] = [
-  createNewCard(new Vector(200, 400)),
-  createNewCard(new Vector(600, 200)),
-];
+const initialCards = new Array(10)
+  .fill(0)
+  .map(_ =>
+    createNewCard(
+      new Vector(100 + Math.random() * 600, 100 + Math.random() * 600)
+    )
+  );
 
 export const Board: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
@@ -71,10 +76,20 @@ export const Board: React.FC = () => {
         return {
           ...card,
           location: bounds.topLeft().add(locationNorm.scale(dimensions)),
-          dimensions: dimensionsNorm.scale(dimensions),
+          dimensions: dimensionsNorm.scale(dimensions).max(minCardSize),
         };
       })
     );
+  };
+
+  const reorderCardHandler = (toIndex: number, { id }: { id: string }) => {
+    setCards(cards => {
+      const index = cards.findIndex(idEquals(id));
+      const clone = cards.slice();
+      const [card] = clone.splice(index, 1);
+      clone.splice(toIndex, 0, card);
+      return clone;
+    });
   };
 
   const {
@@ -96,6 +111,7 @@ export const Board: React.FC = () => {
             payload.map(({ index, card }) => ({ index, element: card }))
           )
       ),
+      reorderCard: makeUndoableFTXHandler(reorderCardHandler),
     },
   });
 
@@ -115,6 +131,14 @@ export const Board: React.FC = () => {
     setTimeout(() => setAnimate(false), 500);
   }, [history]);
 
+  const selectionProps: SelectionProps = {
+    clearSelection,
+    mapSelection,
+    deselect,
+    select,
+    selection,
+  };
+
   return (
     <Root>
       <Canvas
@@ -123,12 +147,9 @@ export const Board: React.FC = () => {
         moveCardsHandler={moveCardsHandler}
         scaleCardsHandler={scaleCardsHandler}
         animate={animate}
-        selection={selection}
-        clearSelection={clearSelection}
-        select={select}
-        deselect={deselect}
-        mapSelection={mapSelection}
+        {...selectionProps}
       ></Canvas>
+      <Layers cards={cards} undoables={undoables} {...selectionProps}></Layers>
       <TimelineArea>
         <BranchNav
           history={history}
@@ -163,7 +184,7 @@ const Root = styled.div`
 `;
 
 const TimelineArea = styled.div`
-  width: 440px;
+  width: 450px;
   flex-shrink: 0;
   border-left: 1px solid #aaa;
   /* padding-left: 16px; */
