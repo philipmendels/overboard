@@ -12,11 +12,7 @@ import { TriangleDownIcon } from '@primer/octicons-react';
 
 import { PayloadByType, BranchSwitchModus, History } from 'use-flexible-undo';
 import { getLastItem, formatTime, useInterval } from './util';
-import {
-  getCurrentBranch,
-  isUndoPossible,
-  isRedoPossible,
-} from './helpers';
+import { getCurrentBranch, isUndoPossible, isRedoPossible } from './helpers';
 
 interface BranchNavProps<PBT extends PayloadByType> {
   history: History<PBT>;

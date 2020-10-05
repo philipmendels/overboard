@@ -98,13 +98,13 @@ export const Layers: React.FC<Props> = ({
 const Layer = styled.div<{ isSelected: boolean }>`
   padding: 8px;
   user-select: none;
-  border-bottom: 1px solid #ddd;
+  margin: 4px 8px;
+  border-radius: 4px;
+  outline: none;
+  /* border-bottom: 1px solid #ddd; */
   background-color: ${({ isSelected }) =>
     isSelected ? '#48a7f6' : 'transparent'};
   color: ${({ isSelected }) => (isSelected ? 'white' : 'inherit')};
-  /* &:not(:last-child) {
-    border-bottom: none;
-  } */
   &:hover {
     background: ${({ isSelected }) => (isSelected ? '#48a7f6' : '#f7f8fa')};
   }

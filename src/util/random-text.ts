@@ -1,10 +1,4 @@
-const containers = [
-  'broodje',
-  'puntzak',
-  'bakje',
-  'schotel',
-  'frietje',
-];
+const containers = ['broodje', 'puntzak', 'bakje', 'schotel', 'frietje'];
 
 const snacks = [
   'smulrol',
@@ -59,6 +53,12 @@ const sauces = [
   'appelmoes',
 ];
 
-const randomFromArray = (arr:any[]) => arr[Math.floor(Math.random() * arr.length)];
+const randomFromArray = (arr: any[]) =>
+  arr[Math.floor(Math.random() * arr.length)];
 
-export const randomText = ():string => [randomFromArray(containers), randomFromArray(snacks), randomFromArray(sauces)].join(' ');
+export const randomText = (): string =>
+  [
+    randomFromArray(containers),
+    randomFromArray(snacks),
+    randomFromArray(sauces),
+  ].join(' ');

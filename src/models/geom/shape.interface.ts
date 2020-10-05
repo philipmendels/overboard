@@ -1,4 +1,4 @@
-import { Bounds } from "./bounds.model";
+import { Bounds } from './bounds.model';
 
 export interface IShape {
   getLeft(): number;

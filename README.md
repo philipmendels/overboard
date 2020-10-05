@@ -5,7 +5,8 @@ Example repo for using the library [use-flexible-undo](https://github.com/philip
 - remove cards
 - move cards
 - scale cards
+- reorder cards (z-index)
 
 <br/><br/>
-<img src="https://github.com/philipmendels/overboard/raw/master/assets/overboard.gif"/>
+<img src="https://github.com/philipmendels/overboard/raw/master/assets/overboard-2.gif"/>
 <br/><br/>

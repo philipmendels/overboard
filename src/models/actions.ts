@@ -9,9 +9,9 @@ import {
 
 type WithSelection<T> = { selection: T };
 
-export type MovePayloadRest = WithSelection<MoveActionSelectionState>;
-export type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
-
+type MovePayloadRest = WithSelection<MoveActionSelectionState>;
+type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
+type ReorderPayloadRest = { id: string };
 export interface PBT {
   moveCards: PayloadFromTo<VectorData> & MovePayloadRest;
   scaleCards: PayloadFromTo<BoundsData> & ScalePayloadRest;
@@ -20,14 +20,17 @@ export interface PBT {
     card: CardData;
     index: number;
   }[];
-  reorderCard: PayloadFromTo<number> & { id: string };
+  reorderCard: PayloadFromTo<number> & ReorderPayloadRest;
 }
 
-export type MoveCardsHandler = (
-  to: VectorData,
-  { selection }: MovePayloadRest
-) => void;
+export type MoveCardsHandler = (to: VectorData, rest: MovePayloadRest) => void;
+
 export type ScaleCardsHandler = (
   boundsData: BoundsData,
-  { selection }: ScalePayloadRest
+  rest: ScalePayloadRest
+) => void;
+
+export type ReorderCardHandler = (
+  toIndex: number,
+  rest: ReorderPayloadRest
 ) => void;

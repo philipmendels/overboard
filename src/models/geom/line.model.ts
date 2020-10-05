@@ -1,7 +1,7 @@
-import * as GeomUtil from "./geom.util";
-import { ILine } from "./line.interface";
-import { LineG } from "./lineG.model";
-import { Vector } from "./vector.model";
+import * as GeomUtil from './geom.util';
+import { ILine } from './line.interface';
+import { LineG } from './lineG.model';
+import { Vector } from './vector.model';
 
 export class Line implements ILine {
   // slope-intercept notation of a linear equation
@@ -12,7 +12,7 @@ export class Line implements ILine {
     // tslint:disable-next-line:variable-name
     readonly _slope: number,
     // tslint:disable-next-line:variable-name
-    readonly _constant: number,
+    readonly _constant: number
   ) {
     if (_slope === undefined) {
       this._slope = Infinity;

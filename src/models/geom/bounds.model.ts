@@ -5,14 +5,13 @@ import { Vector, VectorData } from './vector.model';
 import * as GeomUtil from './geom.util';
 
 export type BoundsData = {
-  left: number,
-  top: number,
-  right: number,
-  bottom: number
-}
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
 
 export class Bounds implements IShape {
-
   public static fromData(data: BoundsData) {
     return new Bounds(data.left, data.top, data.right, data.bottom);
   }
@@ -23,7 +22,7 @@ export class Bounds implements IShape {
       location.y,
       location.x + dimensions.x,
       location.y + dimensions.y
-    )
+    );
   }
 
   public static fromShapes = (shapes: IShape[]): Bounds => {
@@ -35,7 +34,7 @@ export class Bounds implements IShape {
     const maxRight = GeomUtil.arrayMax(shapes.map(shape => shape.getRight()));
     const maxBottom = GeomUtil.arrayMax(shapes.map(shape => shape.getBottom()));
     return new Bounds(minLeft, minTop, maxRight, maxBottom);
-  }
+  };
 
   public static fromPoints = (points: VectorData[]): Bounds => {
     if (!points || !points.length) {
@@ -46,14 +45,14 @@ export class Bounds implements IShape {
     const maxRight = GeomUtil.arrayMax(points.map(point => point.x));
     const maxBottom = GeomUtil.arrayMax(points.map(point => point.y));
     return new Bounds(minLeft, minTop, maxRight, maxBottom);
-  }
+  };
 
   constructor(
     public readonly left: number,
     public readonly top: number,
     public readonly right: number,
-    public readonly bottom: number) {
-  }
+    public readonly bottom: number
+  ) {}
 
   public getBounds(): Bounds {
     return new Bounds(this.left, this.top, this.right, this.bottom);
@@ -109,19 +108,35 @@ export class Bounds implements IShape {
   }
   public edges(orientation: Orientation): Segment[] {
     const edges: Segment[] = [];
-    if (orientation === Orientation.ALL || orientation === Orientation.VERTICAL) {
+    if (
+      orientation === Orientation.ALL ||
+      orientation === Orientation.VERTICAL
+    ) {
       edges.push(this.leftEdge(), this.rightEdge());
     }
-    if (orientation === Orientation.ALL || orientation === Orientation.HORIZONTAL) {
+    if (
+      orientation === Orientation.ALL ||
+      orientation === Orientation.HORIZONTAL
+    ) {
       edges.push(this.topEdge(), this.bottomEdge());
     }
     return edges;
   }
   public containsPoint(point: Vector): boolean {
     // TODO: use GeomUtil.equals?
-    return !(point.x < this.left || point.x > this.right || point.y < this.top || point.y > this.bottom);
+    return !(
+      point.x < this.left ||
+      point.x > this.right ||
+      point.y < this.top ||
+      point.y > this.bottom
+    );
   }
   public intersectsBounds(b: Bounds): boolean {
-    return !(this.left > b.right || this.right < b.left || this.top > b.bottom || this.bottom < b.top);
+    return !(
+      this.left > b.right ||
+      this.right < b.left ||
+      this.top > b.bottom ||
+      this.bottom < b.top
+    );
   }
 }

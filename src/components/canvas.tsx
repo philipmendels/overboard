@@ -8,34 +8,25 @@ import { V, Vector, VectorData } from '../models/geom/vector.model';
 import {
   MoveActionSelectionState,
   ScaleActionSelectionState,
-  SelectionState,
+  SelectionProps,
 } from '../models/selection';
 import {
   idEquals,
   handleSelection,
   BoundsToRectStyle,
   isItemInSelectionRecord,
-  Entry,
-  ValueOf,
 } from '../util/util';
 import { TransformHandle } from './transform-tool/transform-handle.model';
 import { TransformTool } from './transform-tool/transform-tool.model';
 import { getTransformToolBounds } from './transform-tool/transform.util';
 
-interface CanvasProps {
+type CanvasProps = {
   cards: CardData[];
   undoables: HandlersByType<PBT>;
   moveCardsHandler: MoveCardsHandler;
   scaleCardsHandler: ScaleCardsHandler;
   animate: boolean;
-  selection: SelectionState;
-  clearSelection: () => void;
-  mapSelection: <O2 extends SelectionState>(
-    mapFn: (entry: Entry<SelectionState>) => ValueOf<O2>
-  ) => void;
-  select: (ids: string[]) => void;
-  deselect: (ids: string[]) => void;
-}
+} & SelectionProps;
 
 type DragType = 'NONE' | 'CARDS' | 'MARQUEE' | 'TRANSFORM_HANDLE';
 
@@ -235,12 +226,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         <Card
           key={card.id}
           onMouseDown={mouseDownOnCard(card)}
+          onDoubleClick={e => e.stopPropagation()}
           style={{
             ...BoundsToRectStyle(
               Bounds.fromRect(card.location, card.dimensions)
             ),
+            background: card.background,
             // transform: `translate(${card.location.x}px, ${card.location.y}px)`,
-            borderColor: isSelected(card) ? colors.highlight : '#aaa',
+            boxShadow: isSelected(card)
+              ? `inset 0px 0px 0px 1px white`
+              : 'none',
+            border: isSelected(card)
+              ? `1px solid ${colors.highlight}`
+              : `1px solid #eeeeee`,
           }}
           animate={animate}
         >
@@ -291,17 +289,15 @@ const BoardArea = styled.div`
   outline: none;
   flex: 1;
   overflow: hidden;
-  /* background: #f8f8f8; */
-  background: #ddd;
+  background: #eeeeee;
 `;
 
 const Card = styled.div<{ animate: boolean }>`
-  /* background: #f8f8f8; */
-  background: white;
+  color: white;
   padding: 10px;
   position: absolute;
   overflow: hidden;
-  border: 1px solid lightgray;
+  border-radius: 4px;
   cursor: move;
   user-select: none;
   box-sizing: border-box;
@@ -311,7 +307,7 @@ const Card = styled.div<{ animate: boolean }>`
 
 const Marquee = styled.div`
   background-color: transparent;
-  border: 1px dashed black;
+  border: 1px dashed ${colors.highlight};
   position: absolute;
   pointer-events: none;
 `;
@@ -331,6 +327,7 @@ const TransformToolHandle = styled.div<{ animate: boolean }>`
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: ${colors.highlight};
+  background: white;
+  border: 1px solid ${colors.highlight};
   transition: ${props => (props.animate ? 'all 0.3s ease-in-out' : 'none')};
 `;

@@ -2,7 +2,7 @@ import * as React from 'react';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
 import { useEffect, useState } from 'react';
-import { CardData, createNewCard, minCardSize } from '../models/card';
+import { createNewCard, minCardSize } from '../models/card';
 import {
   updateSomeInArray,
   concatArray,
@@ -23,7 +23,12 @@ import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
 import { makeUndoableFTXHandler } from '../util/action-util';
 import { ActionList } from './ufu/action-list';
 import { BranchNav } from './ufu/branch-nav';
-import { PBT, MoveCardsHandler, ScaleCardsHandler } from '../models/actions';
+import {
+  PBT,
+  MoveCardsHandler,
+  ScaleCardsHandler,
+  ReorderCardHandler,
+} from '../models/actions';
 import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
 import { SelectionProps, SelectionState } from '../models/selection';
@@ -82,7 +87,7 @@ export const Board: React.FC = () => {
     );
   };
 
-  const reorderCardHandler = (toIndex: number, { id }: { id: string }) => {
+  const reorderCardHandler: ReorderCardHandler = (toIndex, { id }) => {
     setCards(cards => {
       const index = cards.findIndex(idEquals(id));
       const clone = cards.slice();

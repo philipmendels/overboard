@@ -1,16 +1,12 @@
-import * as GeomUtil from "./geom.util";
-import { ILine } from "./line.interface";
-import { Line } from "./line.model";
-import { Vector } from "./vector.model";
+import * as GeomUtil from './geom.util';
+import { ILine } from './line.interface';
+import { Line } from './line.model';
+import { Vector } from './vector.model';
 
 export class LineG implements ILine {
   // general notation of a linear equation:
   // ax + by + c = 0
-  constructor(
-    public a: number,
-    public b: number,
-    public c: number
-  ) { }
+  constructor(public a: number, public b: number, public c: number) {}
 
   public angleDeg(): number {
     return GeomUtil.slopeToAngleDeg(this.slope());
@@ -39,9 +35,9 @@ export class LineG implements ILine {
   }
   public constant(): number {
     if (this.isVertical()) {
-      return (-this.c) / this.a;
+      return -this.c / this.a;
     }
-    return (-this.c) / this.b;
+    return -this.c / this.b;
   }
   public line(): Line {
     return new Line(this.slope(), this.constant());

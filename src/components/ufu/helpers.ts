@@ -1,4 +1,9 @@
-import { PayloadByType, BranchConnection, HistoryItemUnion, History } from "use-flexible-undo";
+import {
+  PayloadByType,
+  BranchConnection,
+  HistoryItemUnion,
+  History,
+} from 'use-flexible-undo';
 
 export const getCurrentBranch = <PBT extends PayloadByType>(
   prev: History<PBT>

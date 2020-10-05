@@ -1,5 +1,5 @@
-import { Vector } from "./vector.model";
-import { Direction, DirectionCompass, Orientation } from "./direction.enum";
+import { Vector } from './vector.model';
+import { Direction, DirectionCompass, Orientation } from './direction.enum';
 import * as GeomUtil from './geom.util';
 
 export class DirectionMapItem {

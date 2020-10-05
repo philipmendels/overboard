@@ -7,7 +7,7 @@ import { IShape } from './shape.interface';
 import { Vector } from './vector.model';
 
 export class Segment implements ILine, IShape {
-  constructor(public p1: Vector, public p2: Vector) { };
+  constructor(public p1: Vector, public p2: Vector) {}
 
   public delta(): Vector {
     return this.p1.deltaTo(this.p2);
@@ -113,6 +113,11 @@ export class Segment implements ILine, IShape {
     return this.getBottom() - this.getTop();
   }
   public getBounds(): Bounds {
-    return new Bounds(this.getLeft(), this.getTop(), this.getRight(), this.getBottom());
+    return new Bounds(
+      this.getLeft(),
+      this.getTop(),
+      this.getRight(),
+      this.getBottom()
+    );
   }
 }
