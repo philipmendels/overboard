@@ -47,8 +47,7 @@ export const Layers: React.FC<Props> = ({
     <DragDropContext onDragEnd={onDragEnd}>
       <Droppable droppableId="droppable">
         {provided => (
-          <div
-            style={{ width: '200px', borderLeft: '1px solid #aaa' }}
+          <Root
             ref={provided.innerRef}
             onMouseDown={() =>
               Object.keys(selection).length && clearSelection()
@@ -88,12 +87,19 @@ export const Layers: React.FC<Props> = ({
                 </Draggable>
               ))}
             {provided.placeholder}
-          </div>
+          </Root>
         )}
       </Droppable>
     </DragDropContext>
   );
 };
+
+const Root = styled.div`
+  width: 200px;
+  border-left: 1px solid #aaa;
+  height: 100%;
+  overflow-y: scroll;
+`;
 
 const Layer = styled.div<{ isSelected: boolean }>`
   padding: 8px;

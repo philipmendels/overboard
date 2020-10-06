@@ -56,8 +56,8 @@ export const Board: React.FC = () => {
     setSelection(filterObjMapEntries(([id]) => !ids.includes(id)));
   };
 
-  const mapSelection = <O2 extends SelectionState>(
-    mapFn: (entry: Entry<SelectionState>) => ValueOf<O2>
+  const mapSelection = <S extends SelectionState>(
+    mapFn: (entry: Entry<SelectionState>) => ValueOf<S>
   ) => {
     setSelection(mapObjMapValues(mapFn));
   };
@@ -192,8 +192,6 @@ const TimelineArea = styled.div`
   width: 450px;
   flex-shrink: 0;
   border-left: 1px solid #aaa;
-  /* padding-left: 16px; */
-  /* background: #f8f8f8; */
   user-select: none;
   display: flex;
   flex-direction: column;
