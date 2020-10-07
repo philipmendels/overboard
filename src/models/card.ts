@@ -3,6 +3,7 @@ import { randomText } from '../util/random-text';
 import { v4 } from 'uuid';
 
 export type CardData = {
+  index: number;
   id: string;
   location: VectorData;
   dimensions: VectorData;
@@ -23,7 +24,10 @@ const colors = [
   '#EA4968',
 ];
 
+let globalIndex = 0;
+
 export const createNewCard = (vector: Vector): CardData => ({
+  index: globalIndex++,
   id: v4(),
   text: randomText(),
   location: Vector.fromData(vector).subtract(defaultCardSize.multiply(0.5)),

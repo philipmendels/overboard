@@ -90,6 +90,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.keyCode === 8 || event.keyCode === 46) {
+      event.preventDefault();
       // backspace and delete
       removeCards(
         getSelectedCards().map(card => ({
@@ -222,29 +223,34 @@ export const Canvas: React.FC<CanvasProps> = ({
       onKeyDown={keyDownOnBoard}
       onDoubleClick={dblclickBoard}
     >
-      {cards.map(card => (
-        <Card
-          key={card.id}
-          onMouseDown={mouseDownOnCard(card)}
-          onDoubleClick={e => e.stopPropagation()}
-          style={{
-            ...BoundsToRectStyle(
-              Bounds.fromRect(card.location, card.dimensions)
-            ),
-            background: card.background,
-            // transform: `translate(${card.location.x}px, ${card.location.y}px)`,
-            boxShadow: isSelected(card)
-              ? `inset 0px 0px 0px 1px white`
-              : 'none',
-            border: isSelected(card)
-              ? `1px solid ${colors.highlight}`
-              : `1px solid #eeeeee`,
-          }}
-          animate={animate}
-        >
-          {card.text}
-        </Card>
-      ))}
+      {cards
+        .slice()
+        // fixed order in the DOM for css transitions to work consistently
+        .sort((a, b) => (a.index > b.index ? -1 : a.index < b.index ? 1 : 0))
+        .map(card => (
+          <Card
+            key={card.id}
+            onMouseDown={mouseDownOnCard(card)}
+            onDoubleClick={e => e.stopPropagation()}
+            style={{
+              zIndex: cards.findIndex(idEquals(card.id)),
+              ...BoundsToRectStyle(
+                Bounds.fromRect(card.location, card.dimensions)
+              ),
+              background: card.background,
+              // transform: `translate(${card.location.x}px, ${card.location.y}px)`,
+              boxShadow: isSelected(card)
+                ? `inset 0px 0px 0px 1px white`
+                : 'none',
+              border: isSelected(card)
+                ? `1px solid ${colors.highlight}`
+                : `1px solid #eeeeee`,
+            }}
+            animate={animate}
+          >
+            {card.text}
+          </Card>
+        ))}
       {getIsDragging() && dragType === 'MARQUEE' && (
         <Marquee style={BoundsToRectStyle(getMarqueeBounds()!)} />
       )}
@@ -293,6 +299,7 @@ const BoardArea = styled.div`
 `;
 
 const Card = styled.div<{ animate: boolean }>`
+  transition: all 1s ease-in-out;
   color: white;
   padding: 10px;
   position: absolute;
