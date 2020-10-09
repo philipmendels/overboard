@@ -323,7 +323,7 @@ const TransformToolDiv = styled.div<{ animate: boolean }>`
   position: absolute;
   box-sizing: border-box;
   pointer-events: none;
-  z-index: 2;
+  z-index: 1000000; // hacky 😬
   border: 1px solid ${colors.highlight};
   transition: ${props => (props.animate ? 'all 0.3s ease-in-out' : 'none')};
 `;
