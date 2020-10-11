@@ -17,6 +17,7 @@
     "@primer/octicons-react": "^11.0.0",
     "@reach/listbox": "^0.11.2",
     "@reach/menu-button": "^0.11.2",
+    "rambda": "^6.2.0",
     "react": "^16.13.1",
     "react-beautiful-dnd": "^13.0.0",
     "react-dom": "^16.13.1",

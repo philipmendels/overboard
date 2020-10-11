@@ -1,5 +1,7 @@
 import { Bounds } from '../models/geom/bounds.model';
 import { css } from '@emotion/core';
+import { SelectionState } from '../models/selection';
+import * as R from 'rambda';
 
 type ObjMap<V> = Record<string, V>;
 
@@ -24,10 +26,10 @@ export const keyNotIncluded = <K, V>(keys: K[]) => ([k, _]: [K, V]) =>
 
 export const valueToKV = <K, V>(v: V) => (k: K) => [k, v] as [K, V];
 
-export const merge = <V extends object>(
-  partial: Partial<V>
-): Updater<V> => object => ({
-  ...object,
+export const merge = <S, P extends Partial<S>>(
+  partial: P
+): Updater<S> => state => ({
+  ...state,
   ...partial,
 });
 
@@ -255,6 +257,11 @@ export const isItemInSelectionRecord = (selection: Record<string, any>) => <
 >(
   item: T
 ) => selection[item.id] !== undefined;
+
+export const updateIfSelected = <S extends SelectionState, T extends ObjWithId>(
+  selection: S,
+  whenTrueFn: (a: T) => T
+) => R.map(R.when(isItemInSelectionRecord(selection), whenTrueFn));
 
 export const px = (v: string | number) => v + 'px';
 

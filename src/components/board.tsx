@@ -1,22 +1,22 @@
 import * as React from 'react';
+import * as R from 'rambda';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
 import { useEffect, useState } from 'react';
 import { createNewCard, minCardSize } from '../models/card';
 import {
-  updateSomeInArray,
   concatArray,
   filterArrayById,
   wrapFunction,
   filterArrayByIds,
   addByIndex,
-  isItemInSelectionRecord,
-  concatObjMapEntries,
-  filterObjMapEntries,
   Entry,
   ValueOf,
   mapObjMapValues,
   idEquals,
+  updateIfSelected,
+  merge,
+  valueToKV,
 } from '../util/util';
 import { Bounds } from '../models/geom/bounds.model';
 import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
@@ -49,11 +49,11 @@ export const Board: React.FC = () => {
   const clearSelection = () => setSelection({});
 
   const select = (ids: string[]) => {
-    setSelection(concatObjMapEntries(ids.map(id => [id, null])));
+    setSelection(merge(Object.fromEntries(ids.map(valueToKV(null)))));
   };
 
   const deselect = (ids: string[]) => {
-    setSelection(filterObjMapEntries(([id]) => !ids.includes(id)));
+    setSelection(R.omit(ids));
   };
 
   const mapSelection = <S extends SelectionState>(
@@ -64,7 +64,7 @@ export const Board: React.FC = () => {
 
   const moveCardsHandler: MoveCardsHandler = (to, { selection }) => {
     setCards(
-      updateSomeInArray(isItemInSelectionRecord(selection), card => ({
+      updateIfSelected(selection, card => ({
         ...card,
         location: V(to).add(selection[card.id].locationRel),
       }))
@@ -76,7 +76,7 @@ export const Board: React.FC = () => {
     const dimensions = bounds.dimensions();
 
     setCards(
-      updateSomeInArray(isItemInSelectionRecord(selection), card => {
+      updateIfSelected(selection, card => {
         const { locationNorm, dimensionsNorm } = selection[card.id];
         return {
           ...card,
@@ -88,13 +88,7 @@ export const Board: React.FC = () => {
   };
 
   const reorderCardHandler: ReorderCardHandler = (toIndex, { id }) => {
-    setCards(cards => {
-      const index = cards.findIndex(idEquals(id));
-      const clone = cards.slice();
-      const [card] = clone.splice(index, 1);
-      clone.splice(toIndex, 0, card);
-      return clone;
-    });
+    setCards(cards => R.move(cards.findIndex(idEquals(id)), toIndex, cards));
   };
 
   const {
