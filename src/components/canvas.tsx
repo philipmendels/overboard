@@ -15,6 +15,7 @@ import {
   handleSelection,
   BoundsToRectStyle,
   isItemInSelectionRecord,
+  merge,
 } from '../util/util';
 import { TransformHandle } from './transform-tool/transform-handle.model';
 import { TransformTool } from './transform-tool/transform-tool.model';
@@ -28,7 +29,25 @@ type CanvasProps = {
   animate: boolean;
 } & SelectionProps;
 
-type DragType = 'NONE' | 'CARDS' | 'MARQUEE' | 'TRANSFORM_HANDLE';
+type DragState =
+  | {
+      type: 'NONE';
+    }
+  | {
+      type: 'CARDS';
+      startLocation: Vector;
+      location: Vector;
+    }
+  | {
+      type: 'MARQUEE';
+      startLocation: Vector;
+      location: Vector;
+    }
+  | {
+      type: 'TRANSFORM_HANDLE';
+      handle: TransformHandle;
+      startBounds: Bounds;
+    };
 
 const transformTool = new TransformTool();
 
@@ -50,24 +69,12 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const hasSelection = () => Object.values(selection).length;
 
-  const [dragType, setDragType] = useState<DragType>('NONE');
-  const [dragStartLocation, setDragStartLocation] = useState<Vector | null>(
-    null
-  );
-  const [dragLocation, setDragLocation] = useState<Vector | null>(null);
-  const getIsDragging = () => dragLocation !== null;
+  const [dragState, setDragState] = useState<DragState>({ type: 'NONE' });
 
-  const [
-    activeTransformHandle,
-    setActiveTransformHandle,
-  ] = useState<TransformHandle | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const [scaleStartBounds, setScaleStartBounds] = useState<Bounds | null>(null);
-
-  const getMarqueeBounds = () =>
-    dragLocation &&
-    dragStartLocation &&
-    Bounds.fromPoints([dragLocation, dragStartLocation]);
+  const getMarqueeBounds = (dragStartLocation: Vector, dragLocation: Vector) =>
+    Bounds.fromPoints([dragStartLocation, dragLocation]);
 
   const getSelectionBounds = (): Bounds => {
     const selectedCardsBoundsArray = getSelectedCards().map(card =>
@@ -113,24 +120,30 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (hasSelection()) {
       clearSelection();
     }
-    setDragType('MARQUEE');
-
-    setDragStartLocation(new Vector(event.clientX, event.clientY));
+    const location = new Vector(event.clientX, event.clientY);
+    setDragState({
+      type: 'MARQUEE',
+      location,
+      startLocation: location,
+    });
   };
 
   const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
-    if (dragType !== 'NONE') {
-      setDragLocation(V(boardLocation));
+    if (dragState.type !== 'NONE') {
+      setIsDragging(true);
     }
-    if (dragType === 'CARDS') {
+    if (dragState.type === 'MARQUEE' || dragState.type === 'CARDS') {
+      setDragState(merge({ location: V(boardLocation) }));
+    }
+    if (dragState.type === 'CARDS') {
       moveCardsHandler(boardLocation, {
         selection: selection as MoveActionSelectionState,
       });
-    } else if (dragType === 'TRANSFORM_HANDLE') {
+    } else if (dragState.type === 'TRANSFORM_HANDLE') {
       const ttBounds = getTransformToolBounds({
-        startBounds: scaleStartBounds!,
-        handle: activeTransformHandle!,
+        startBounds: dragState.startBounds,
+        handle: dragState.handle,
         mouseLocation: V(boardLocation),
       });
       scaleCardsHandler(ttBounds, {
@@ -142,9 +155,12 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
-    if (getIsDragging()) {
-      if (dragType === 'MARQUEE') {
-        const mb = getMarqueeBounds()!;
+    if (isDragging) {
+      if (dragState.type === 'MARQUEE') {
+        const mb = getMarqueeBounds(
+          dragState.startLocation,
+          dragState.location
+        );
         const cardIdsToSelect = cards
           .filter(card => {
             const cardBounds = Bounds.fromRect(card.location, card.dimensions);
@@ -154,31 +170,34 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (cardIdsToSelect.length) {
           select(cardIdsToSelect);
         }
-      } else if (dragType === 'CARDS') {
+      } else if (dragState.type === 'CARDS') {
         moveCards({
           selection: selection as MoveActionSelectionState,
-          from: dragStartLocation!,
+          from: dragState.startLocation,
           to: boardLocation,
         });
-      } else if (dragType === 'TRANSFORM_HANDLE') {
+      } else if (dragState.type === 'TRANSFORM_HANDLE') {
         scaleCards({
-          from: scaleStartBounds!,
+          from: dragState.startBounds,
           to: getSelectionBounds(),
           selection: selection as ScaleActionSelectionState,
         });
       }
     }
-    setDragType('NONE');
-    setDragLocation(null);
+    setDragState({ type: 'NONE' });
+    setIsDragging(false);
   };
 
   const mouseDownOnCard = (mouseDownCard: CardData) => (
     event: React.MouseEvent<HTMLDivElement>
   ): void => {
     event.stopPropagation();
-    const loc = new Vector(event.clientX, event.clientY);
-    setDragStartLocation(loc);
-    setDragType('CARDS');
+    const location = new Vector(event.clientX, event.clientY);
+    setDragState({
+      type: 'CARDS',
+      location,
+      startLocation: location,
+    });
     handleSelection(
       event,
       isSelected(mouseDownCard),
@@ -186,8 +205,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       () => select([mouseDownCard.id]),
       () => deselect([mouseDownCard.id])
     );
+    console.log(selection);
     mapSelection<MoveActionSelectionState>(([id]) => ({
-      locationRel: V(getCardById(id)!.location).subtract(loc),
+      locationRel: V(getCardById(id)!.location).subtract(location),
     }));
   };
 
@@ -196,20 +216,22 @@ export const Canvas: React.FC<CanvasProps> = ({
     handle: TransformHandle
   ) => {
     event.stopPropagation();
-    setDragType('TRANSFORM_HANDLE');
 
-    const selectedCardsBounds = getSelectionBounds();
+    const startBounds = getSelectionBounds();
 
-    setScaleStartBounds(selectedCardsBounds);
-    setActiveTransformHandle(handle);
+    setDragState({
+      type: 'TRANSFORM_HANDLE',
+      handle,
+      startBounds,
+    });
 
-    const dimensions = selectedCardsBounds.dimensions();
+    const dimensions = startBounds.dimensions();
 
     mapSelection<ScaleActionSelectionState>(([id]) => {
       const selectedCard = getCardById(id)!;
       return {
         locationNorm: V(selectedCard.location)
-          .subtract(selectedCardsBounds.topLeft())
+          .subtract(startBounds.topLeft())
           .divideByVector(dimensions),
         dimensionsNorm: V(selectedCard.dimensions).divideByVector(dimensions),
       };
@@ -256,10 +278,14 @@ export const Canvas: React.FC<CanvasProps> = ({
             {card.text}
           </Card>
         ))}
-      {getIsDragging() && dragType === 'MARQUEE' && (
-        <Marquee style={BoundsToRectStyle(getMarqueeBounds()!)} />
+      {isDragging && dragState.type === 'MARQUEE' && (
+        <Marquee
+          style={BoundsToRectStyle(
+            getMarqueeBounds(dragState.startLocation, dragState.location)
+          )}
+        />
       )}
-      {hasSelection() && !(getIsDragging() && dragType === 'CARDS') && (
+      {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
         <TransformToolDiv
           animate={animate}
           style={BoundsToRectStyle(getSelectionBounds())}
