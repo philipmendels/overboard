@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-undef
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
@@ -9,4 +10,7 @@ module.exports = {
     'prettier',
     'prettier/@typescript-eslint',
   ],
+  rules: {
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+  },
 };

@@ -11,17 +11,16 @@ type VinKVUpdater<K, V> = (kv: [K, V]) => V;
 
 interface ObjWithId {
   id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export const notEquals = <V>(v: V) => (v: V) => v !== v;
-export const valueEquals = <V>(v: V) => (v: V) => v === v;
+export const notEquals = <V>(v1: V) => (v: V) => v1 !== v;
+export const valueEquals = <V>(v1: V) => (v: V) => v1 === v;
 export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
 export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj: O) =>
   obj.id !== id;
-const keyEquals = <K, V>(key: K) => ([k, _]: [K, V]) => key === k;
-export const keyEqualsNot = <K, V>(key: K) => ([k, _]: [K, V]) => key !== k;
-export const keyNotIncluded = <K, V>(keys: K[]) => ([k, _]: [K, V]) =>
+export const keyEqualsNot = <K, V>(key: K) => ([k]: [K, V]) => key !== k;
+export const keyNotIncluded = <K, V>(keys: K[]) => ([k]: [K, V]) =>
   !keys.includes(k);
 
 export const valueToKV = <K, V>(v: V) => (k: K) => [k, v] as [K, V];
@@ -33,7 +32,7 @@ export const merge = <S, P extends Partial<S>>(
   ...partial,
 });
 
-export const mergeKV = <K, V extends object>(
+export const mergeKV = <K, V extends Record<string, unknown>>(
   partial: Partial<V>
 ): Updater<[K, V]> => ([k, v]) => [
   k,
@@ -51,17 +50,6 @@ const updateSelectively = <V>(selector: Selector<V>, updater: Updater<V>) => (
   v: V
 ): V => (selector(v) ? updater(v) : v);
 
-/**
- * Curried function that takes a selector fn (A) and updater fn (B), and returns a
- * function that takes an array and returns a shallow copy for which
- * the items are selectively updated using A and B.
- * @param selector
- * Predicate function that takes an item from the array and that needs to return a
- * boolean that indicates if the item should be updated.
- * @param updater
- * Function that takes a an item from the array and that needs to return an updated item.
- * Only called when the selector returns true for the same item.
- */
 export const updateSomeInArray = <V>(
   selector: Selector<V>,
   updater: Updater<V>
@@ -109,33 +97,13 @@ export const reduceSelection = <T>(
 export const addByIndexMapped = <P, T>(
   mapFn: (item: P) => { index: number; element: T }
 ) => (payload: P[]) => addByIndex(payload.map(mapFn));
-/**
- * Curried function that takes a selector fn (A) and updater fn (B), and returns a
- * function that takes an object and returns a shallow copy for which
- * the values are selectively updated using A and B.
- * @param selector
- * Predicate function that takes a key-value pair (object entry) and that needs to return a
- * boolean that indicates if the value should be updated.
- * @param updater
- * Function that takes a key-value pair (object entry) and that needs to return an updated value.
- * Only called when the selector returns true for the same pair. In order to cater for the
- * most common use case, this function does not enable you to update the key.
- */
+
 export const updateSomeInObjMap = <V>(
   selector: Selector<[string, V]>,
   updater: VinKVUpdater<string, V>
 ): Updater<ObjMap<V>> =>
   mapObjMap(updateSelectively(selector, getKVUpdater(updater)));
 
-/**
- * Curried function that takes an updater fn (A) and returns a
- * function that takes an object and returns a shallow copy for which
- * all values are updated using A.
- * @param updater
- * Function that takes a key-value pair (object entry) and that needs to return an updated value.
- * Only called when the selector returns true for the same pair. In order to cater for the
- * most common use case, this function does not enable you to update the key.
- */
 export const updateAllInObjMap = <V>(
   updater: VinKVUpdater<string, V>
 ): Updater<ObjMap<V>> => mapObjMap(getKVUpdater(updater));
@@ -145,11 +113,17 @@ export const mapObjMap = <V>(
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(Object.entries(objMap).map(updater));
 
-export const mapObjMap2 = <O extends object, O2 extends Object>(
+export const mapObjMap2 = <
+  O extends Record<string, unknown>,
+  O2 extends Record<string, unknown>
+>(
   mapFn: (e: Entry<O>) => Entry<O2>
 ) => (objMap: O) => fromEntries(toEntries(objMap).map(mapFn));
 
-export const mapObjMapValues = <O extends object, O2 extends Object>(
+export const mapObjMapValues = <
+  O extends Record<string, unknown>,
+  O2 extends Record<string, unknown>
+>(
   mapFn: (e: Entry<O>) => ValueOf<O2>
 ) => (objMap: O) =>
   fromEntries(
@@ -166,46 +140,27 @@ export const addToObjMap = <V>(
 ): Updater<ObjMap<V>> => objMap =>
   Object.fromEntries(Object.entries(objMap).concat(entryOrEntries));
 
-export type Entry<O extends Object> = { [K in keyof O]: [K, O[K]] }[keyof O];
+export type Entry<O extends Record<string, unknown>> = {
+  [K in keyof O]: [K, O[K]];
+}[keyof O];
+
 export type ValueOf<T> = T[keyof T];
 
-export const concatObjMapEntries = <O extends object>(entries: Entry<O>[]) => (
-  o: O
-) => fromEntries(toEntries(o).concat(entries));
+export const concatObjMapEntries = <O extends Record<string, unknown>>(
+  entries: Entry<O>[]
+) => (o: O) => fromEntries(toEntries(o).concat(entries));
 
-export const filterObjMapEntries = <O extends object>(
+export const filterObjMapEntries = <O extends Record<string, unknown>>(
   filter: Selector<Entry<O>>
 ) => (objMap: O) => fromEntries(toEntries(objMap).filter(filter));
 
-const toEntries = <O extends object>(obj: O) =>
+const toEntries = <O extends Record<string, unknown>>(obj: O) =>
   Object.entries(obj) as Entry<O>[];
 
-const fromEntries = <O extends object>(entries: Entry<O>[]) =>
+const fromEntries = <O extends Record<string, unknown>>(entries: Entry<O>[]) =>
   Object.fromEntries(entries) as O;
-/**
- * Curried function that takes a selector fn (A) and updater fn (B), and returns a
- * function that takes a Map and returns a shallow copy for which
- * the values are selectively updated using A and B.
- * @param selector
- * Predicate function that takes a key-value pair (Map entry) and that needs to return a
- * boolean that indicates if the value should be updated.
- * @param updater
- * Function that takes a key-value pair (Map entry) and that needs to return an updated value.
- * Only called when the selector returns true for the same pair. In order to cater for the
- * most common use case, this function does not enable you to update the key.
- */
-export const updateSomeInMap = <K, V>(
-  selector: Selector<[K, V]>,
-  updater: VinKVUpdater<K, V>
-): Updater<Map<K, V>> => map =>
-  new Map(
-    Array.from(
-      map.entries(),
-      updateSelectively(selector, getKVUpdater(updater))
-    )
-  );
 
-export const isSelectionKeyDown = (event: React.MouseEvent<any>) => {
+export const isSelectionKeyDown = (event: React.MouseEvent<unknown>) => {
   if (event.shiftKey || event.metaKey || event.ctrlKey) {
     return true;
   }
@@ -233,6 +188,7 @@ export const handleSelection = (
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Fn = (...args: any[]) => any;
 
 export const wrapFunction = (callback: Fn) => <F extends Fn>(fn: F) => (
@@ -252,7 +208,7 @@ export const isItemSelected = (selection: string[]) => <T extends ObjWithId>(
   item: T
 ) => selection.includes(item.id);
 
-export const isItemInSelectionRecord = (selection: Record<string, any>) => <
+export const isItemInSelectionRecord = (selection: Record<string, unknown>) => <
   T extends ObjWithId
 >(
   item: T

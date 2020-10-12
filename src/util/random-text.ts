@@ -53,7 +53,7 @@ const sauces = [
   'appelmoes',
 ];
 
-const randomFromArray = (arr: any[]) =>
+const randomFromArray = (arr: unknown[]) =>
   arr[Math.floor(Math.random() * arr.length)];
 
 export const randomText = (): string =>

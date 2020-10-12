@@ -45,7 +45,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   mapSelection,
 }) => {
   const isSelected = isItemInSelectionRecord(selection);
+
   const getSelectedCards = () => cards.filter(isSelected);
+
   const hasSelection = () => Object.values(selection).length;
 
   const [dragType, setDragType] = useState<DragType>('NONE');
@@ -224,21 +226,24 @@ export const Canvas: React.FC<CanvasProps> = ({
       onDoubleClick={dblclickBoard}
     >
       {cards
+        .map((card, index) => ({ card, zIndex: index }))
         .slice()
         // fixed order in the DOM for css transitions to work consistently
-        .sort((a, b) => (a.index > b.index ? -1 : a.index < b.index ? 1 : 0))
-        .map(card => (
+        .sort((a, b) =>
+          a.card.index > b.card.index ? -1 : a.card.index < b.card.index ? 1 : 0
+        )
+        .map(({ card, zIndex }) => (
           <Card
             key={card.id}
             onMouseDown={mouseDownOnCard(card)}
             onDoubleClick={e => e.stopPropagation()}
             style={{
-              zIndex: cards.findIndex(idEquals(card.id)),
+              zIndex,
               ...BoundsToRectStyle(
                 Bounds.fromRect(card.location, card.dimensions)
               ),
               background: card.background,
-              // transform: `translate(${card.location.x}px, ${card.location.y}px)`,
+              // transform: `translate(${card.location.x}px, ${card.location.y}px) translateZ(0)`,
               boxShadow: isSelected(card)
                 ? `inset 0px 0px 0px 1px white`
                 : 'none',
@@ -254,34 +259,33 @@ export const Canvas: React.FC<CanvasProps> = ({
       {getIsDragging() && dragType === 'MARQUEE' && (
         <Marquee style={BoundsToRectStyle(getMarqueeBounds()!)} />
       )}
-      {getSelectedCards().length > 0 &&
-        !(getIsDragging() && dragType === 'CARDS') && (
-          <TransformToolDiv
-            animate={animate}
-            style={BoundsToRectStyle(getSelectionBounds())}
-          >
-            {transformTool.handles.map((handle, index) => {
-              const handleStyle = {
-                left: handle.getStyleLeft(),
-                top: handle.getStyleTop(),
-                widht: handle.getSize(),
-                height: handle.getSize(),
-                cursor: handle.getStyleCursor(),
-              };
-              return (
-                <TransformToolHandle
-                  animate={animate}
-                  draggable={false}
-                  key={index}
-                  style={handleStyle}
-                  onMouseDown={e => {
-                    mouseDownOnHandle(e, handle);
-                  }}
-                />
-              );
-            })}
-          </TransformToolDiv>
-        )}
+      {hasSelection() && !(getIsDragging() && dragType === 'CARDS') && (
+        <TransformToolDiv
+          animate={animate}
+          style={BoundsToRectStyle(getSelectionBounds())}
+        >
+          {transformTool.handles.map((handle, index) => {
+            const handleStyle = {
+              left: handle.getStyleLeft(),
+              top: handle.getStyleTop(),
+              widht: handle.getSize(),
+              height: handle.getSize(),
+              cursor: handle.getStyleCursor(),
+            };
+            return (
+              <TransformToolHandle
+                animate={animate}
+                draggable={false}
+                key={index}
+                style={handleStyle}
+                onMouseDown={e => {
+                  mouseDownOnHandle(e, handle);
+                }}
+              />
+            );
+          })}
+        </TransformToolDiv>
+      )}
     </BoardArea>
   );
 };
@@ -299,7 +303,6 @@ const BoardArea = styled.div`
 `;
 
 const Card = styled.div<{ animate: boolean }>`
-  transition: all 1s ease-in-out;
   color: white;
   padding: 10px;
   position: absolute;

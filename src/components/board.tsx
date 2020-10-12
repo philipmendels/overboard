@@ -36,7 +36,7 @@ import { Layers } from './layers/layers';
 
 const initialCards = new Array(10)
   .fill(0)
-  .map(_ =>
+  .map(() =>
     createNewCard(
       new Vector(100 + Math.random() * 600, 100 + Math.random() * 600)
     )

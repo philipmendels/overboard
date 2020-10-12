@@ -55,4 +55,5 @@ export const describeAction = ({
   type,
   payload,
 }: HistoryItemUnion<PBT>): ReactNode =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type === 'start' ? 'Start' : (payloadDescribers[type] as any)(payload);
