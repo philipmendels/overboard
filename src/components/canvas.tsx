@@ -67,7 +67,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const getSelectedCards = () => cards.filter(isSelected);
 
-  const hasSelection = () => Object.values(selection).length;
+  const hasSelection = () => !!Object.values(selection).length;
 
   const [dragState, setDragState] = useState<DragState>({ type: 'NONE' });
 
@@ -205,10 +205,14 @@ export const Canvas: React.FC<CanvasProps> = ({
       () => select([mouseDownCard.id]),
       () => deselect([mouseDownCard.id])
     );
-    console.log(selection);
-    mapSelection<MoveActionSelectionState>(([id]) => ({
-      locationRel: V(getCardById(id)!.location).subtract(location),
-    }));
+    mapSelection<MoveActionSelectionState>(([id]) => {
+      const card = getCardById(id);
+      return {
+        locationRel: card
+          ? V(card.location).subtract(location)
+          : new Vector(0, 0),
+      };
+    });
   };
 
   const mouseDownOnHandle = (
@@ -228,12 +232,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     const dimensions = startBounds.dimensions();
 
     mapSelection<ScaleActionSelectionState>(([id]) => {
-      const selectedCard = getCardById(id)!;
+      const card = getCardById(id);
       return {
-        locationNorm: V(selectedCard.location)
-          .subtract(startBounds.topLeft())
-          .divideByVector(dimensions),
-        dimensionsNorm: V(selectedCard.dimensions).divideByVector(dimensions),
+        locationNorm: card
+          ? V(card.location)
+              .subtract(startBounds.topLeft())
+              .divideByVector(dimensions)
+          : new Vector(0, 0),
+        dimensionsNorm: card
+          ? V(card.dimensions).divideByVector(dimensions)
+          : new Vector(0, 0),
       };
     });
   };
