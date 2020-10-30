@@ -1,6 +1,6 @@
 import { Bounds } from '../models/geom/bounds.model';
 import { css } from '@emotion/core';
-import { SelectionState } from '../models/selection';
+import { SelectionState, StandardSelectionState } from '../models/selection';
 import * as R from 'rambda';
 
 type ObjMap<V> = Record<string, V>;
@@ -86,10 +86,10 @@ export const addByIndex = <T>(list: { index: number; element: T }[]) => (
 };
 
 export const reduceSelection = <T>(
-  selection: string[],
+  selection: StandardSelectionState,
   fn: (id: string) => T
 ) =>
-  selection.reduce<Record<string, T>>((acc, id) => {
+  Object.keys(selection).reduce<Record<string, T>>((acc, id) => {
     acc[id] = fn(id);
     return acc;
   }, {});

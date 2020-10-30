@@ -3,16 +3,13 @@ import * as R from 'rambda';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
 import { useEffect, useState } from 'react';
-import { createNewCard, minCardSize } from '../models/card';
+import { CardData, createNewCard, minCardSize } from '../models/card';
 import {
   concatArray,
   filterArrayById,
   wrapFunction,
   filterArrayByIds,
   addByIndex,
-  Entry,
-  ValueOf,
-  mapObjMapValues,
   idEquals,
   updateIfSelected,
   merge,
@@ -31,7 +28,7 @@ import {
 } from '../models/actions';
 import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
-import { SelectionProps, SelectionState } from '../models/selection';
+import { SelectionProps, StandardSelectionState } from '../models/selection';
 import { Layers } from './layers/layers';
 
 const initialCards = new Array(10)
@@ -44,7 +41,7 @@ const initialCards = new Array(10)
 
 export const Board: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
-  const [selection, setSelection] = useState<SelectionState>({});
+  const [selection, setSelection] = useState<StandardSelectionState>({});
 
   const clearSelection = () => setSelection({});
 
@@ -54,12 +51,6 @@ export const Board: React.FC = () => {
 
   const deselect = (ids: string[]) => {
     setSelection(R.omit(ids));
-  };
-
-  const mapSelection = <S extends SelectionState>(
-    mapFn: (entry: Entry<SelectionState>) => ValueOf<S>
-  ) => {
-    setSelection(mapObjMapValues(mapFn));
   };
 
   const moveCardsHandler: MoveCardsHandler = (to, { selection }) => {
@@ -132,10 +123,10 @@ export const Board: React.FC = () => {
 
   const selectionProps: SelectionProps = {
     clearSelection,
-    mapSelection,
     deselect,
     select,
     selection,
+    updateSelection: s => setSelection(s),
   };
 
   return (

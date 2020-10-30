@@ -1,4 +1,5 @@
 import styled from '@emotion/styled';
+import { omit } from 'rambda';
 import React, { useState } from 'react';
 import { HandlersByType } from 'use-flexible-undo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
@@ -12,10 +13,11 @@ import {
 } from '../models/selection';
 import {
   idEquals,
-  handleSelection,
   BoundsToRectStyle,
   isItemInSelectionRecord,
   merge,
+  isSelectionKeyDown,
+  reduceSelection,
 } from '../util/util';
 import { TransformHandle } from './transform-tool/transform-handle.model';
 import { TransformTool } from './transform-tool/transform-tool.model';
@@ -37,6 +39,7 @@ type DragState =
       type: 'CARDS';
       startLocation: Vector;
       location: Vector;
+      selection: MoveActionSelectionState;
     }
   | {
       type: 'MARQUEE';
@@ -47,6 +50,7 @@ type DragState =
       type: 'TRANSFORM_HANDLE';
       handle: TransformHandle;
       startBounds: Bounds;
+      selection: ScaleActionSelectionState;
     };
 
 const transformTool = new TransformTool();
@@ -59,9 +63,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   animate,
   selection,
   select,
-  deselect,
   clearSelection,
-  mapSelection,
+  updateSelection,
 }) => {
   const isSelected = isItemInSelectionRecord(selection);
 
@@ -138,7 +141,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     if (dragState.type === 'CARDS') {
       moveCardsHandler(boardLocation, {
-        selection: selection as MoveActionSelectionState,
+        selection: dragState.selection,
       });
     } else if (dragState.type === 'TRANSFORM_HANDLE') {
       const ttBounds = getTransformToolBounds({
@@ -147,7 +150,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         mouseLocation: V(boardLocation),
       });
       scaleCardsHandler(ttBounds, {
-        selection: selection as ScaleActionSelectionState,
+        selection: dragState.selection,
       });
     }
     event.stopPropagation();
@@ -172,7 +175,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       } else if (dragState.type === 'CARDS') {
         moveCards({
-          selection: selection as MoveActionSelectionState,
+          selection: dragState.selection,
           from: dragState.startLocation,
           to: boardLocation,
         });
@@ -180,7 +183,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         scaleCards({
           from: dragState.startBounds,
           to: getSelectionBounds(),
-          selection: selection as ScaleActionSelectionState,
+          selection: dragState.selection,
         });
       }
     }
@@ -193,25 +196,32 @@ export const Canvas: React.FC<CanvasProps> = ({
   ): void => {
     event.stopPropagation();
     const location = new Vector(event.clientX, event.clientY);
-    setDragState({
-      type: 'CARDS',
-      location,
-      startLocation: location,
-    });
-    handleSelection(
-      event,
-      isSelected(mouseDownCard),
-      clearSelection,
-      () => select([mouseDownCard.id]),
-      () => deselect([mouseDownCard.id])
-    );
-    mapSelection<MoveActionSelectionState>(([id]) => {
+
+    const isCardSelected = isSelected(mouseDownCard);
+    const newSel = isSelectionKeyDown(event)
+      ? isCardSelected
+        ? omit([mouseDownCard.id])(selection)
+        : { ...selection, [mouseDownCard.id]: null }
+      : isCardSelected
+      ? selection
+      : { [mouseDownCard.id]: null };
+
+    updateSelection(newSel);
+
+    const dragSelState = reduceSelection(newSel, id => {
       const card = getCardById(id);
       return {
         locationRel: card
           ? V(card.location).subtract(location)
           : new Vector(0, 0),
       };
+    });
+
+    setDragState({
+      type: 'CARDS',
+      location,
+      startLocation: location,
+      selection: dragSelState,
     });
   };
 
@@ -223,15 +233,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     const startBounds = getSelectionBounds();
 
-    setDragState({
-      type: 'TRANSFORM_HANDLE',
-      handle,
-      startBounds,
-    });
-
     const dimensions = startBounds.dimensions();
 
-    mapSelection<ScaleActionSelectionState>(([id]) => {
+    const sel = reduceSelection(selection, id => {
       const card = getCardById(id);
       return {
         locationNorm: card
@@ -243,6 +247,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           ? V(card.dimensions).divideByVector(dimensions)
           : new Vector(0, 0),
       };
+    });
+
+    setDragState({
+      type: 'TRANSFORM_HANDLE',
+      handle,
+      startBounds,
+      selection: sel,
     });
   };
 
