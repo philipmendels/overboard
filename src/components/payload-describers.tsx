@@ -43,6 +43,11 @@ const payloadDescribers: PayloadDescribers = {
       <ActionType>Reorder</ActionType> card from index {from} to {to}
     </>
   ),
+  updateText: ({ to }) => (
+    <>
+      <ActionType>Update text</ActionType> '{to.slice(0, 16)}...'
+    </>
+  ),
 };
 
 const ActionType = styled.span`

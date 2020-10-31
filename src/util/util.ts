@@ -16,7 +16,8 @@ interface ObjWithId {
 
 export const notEquals = <V>(v1: V) => (v: V) => v1 !== v;
 export const valueEquals = <V>(v1: V) => (v: V) => v1 === v;
-export const idEquals = (id: string) => (obj: ObjWithId) => obj.id === id;
+export const idEquals = (id: string) => <O extends ObjWithId>(obj: O) =>
+  obj.id === id;
 export const idEqualsNot = (id: string) => <O extends ObjWithId>(obj: O) =>
   obj.id !== id;
 export const keyEqualsNot = <K, V>(key: K) => ([k]: [K, V]) => key !== k;

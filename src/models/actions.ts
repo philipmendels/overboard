@@ -11,7 +11,7 @@ type WithSelection<T> = { selection: T };
 
 type MovePayloadRest = WithSelection<MoveActionSelectionState>;
 type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
-type ReorderPayloadRest = { id: string };
+type IdRest = { id: string };
 export interface PBT {
   moveCards: PayloadFromTo<VectorData> & MovePayloadRest;
   scaleCards: PayloadFromTo<BoundsData> & ScalePayloadRest;
@@ -20,7 +20,8 @@ export interface PBT {
     card: CardData;
     index: number;
   }[];
-  reorderCard: PayloadFromTo<number> & ReorderPayloadRest;
+  reorderCard: PayloadFromTo<number> & IdRest;
+  updateText: PayloadFromTo<string> & IdRest;
 }
 
 export type MoveCardsHandler = (to: VectorData, rest: MovePayloadRest) => void;
@@ -30,7 +31,5 @@ export type ScaleCardsHandler = (
   rest: ScalePayloadRest
 ) => void;
 
-export type ReorderCardHandler = (
-  toIndex: number,
-  rest: ReorderPayloadRest
-) => void;
+export type ReorderCardHandler = (toIndex: number, rest: IdRest) => void;
+export type UpdateTextHandler = (newText: string, rest: IdRest) => void;

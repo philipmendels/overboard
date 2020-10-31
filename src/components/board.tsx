@@ -3,7 +3,7 @@ import * as R from 'rambda';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
 import { useEffect, useState } from 'react';
-import { CardData, createNewCard, minCardSize } from '../models/card';
+import { createNewCard, minCardSize } from '../models/card';
 import {
   concatArray,
   filterArrayById,
@@ -14,6 +14,7 @@ import {
   updateIfSelected,
   merge,
   valueToKV,
+  updateSomeInArray,
 } from '../util/util';
 import { Bounds } from '../models/geom/bounds.model';
 import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
@@ -25,6 +26,7 @@ import {
   MoveCardsHandler,
   ScaleCardsHandler,
   ReorderCardHandler,
+  UpdateTextHandler,
 } from '../models/actions';
 import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
@@ -79,7 +81,16 @@ export const Board: React.FC = () => {
   };
 
   const reorderCardHandler: ReorderCardHandler = (toIndex, { id }) => {
-    setCards(cards => R.move(cards.findIndex(idEquals(id)), toIndex, cards));
+    setCards(cards => {
+      const clone = cards.slice();
+      const [removed] = clone.splice(cards.findIndex(idEquals(id)), 1);
+      clone.splice(toIndex, 0, removed);
+      return clone;
+    });
+  };
+
+  const updateTextHandler: UpdateTextHandler = (text, { id }) => {
+    setCards(updateSomeInArray(idEquals(id), merge({ text })));
   };
 
   const {
@@ -102,6 +113,7 @@ export const Board: React.FC = () => {
           )
       ),
       reorderCard: makeUndoableFTXHandler(reorderCardHandler),
+      updateText: makeUndoableFTXHandler(updateTextHandler),
     },
   });
 

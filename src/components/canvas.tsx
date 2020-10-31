@@ -23,6 +23,9 @@ import { TransformHandle } from './transform-tool/transform-handle.model';
 import { TransformTool } from './transform-tool/transform-tool.model';
 import { getTransformToolBounds } from './transform-tool/transform.util';
 
+import { Dialog } from '@reach/dialog';
+import '@reach/dialog/styles.css';
+
 type CanvasProps = {
   cards: CardData[];
   undoables: HandlersByType<PBT>;
@@ -88,7 +91,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const getCardById = (id: string) => cards.find(idEquals(id));
 
-  const { moveCards, scaleCards, addCard, removeCards } = undoables;
+  const { moveCards, scaleCards, addCard, removeCards, updateText } = undoables;
 
   // UI events
 
@@ -257,89 +260,162 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
+  const [dialogState, setDialogState] = React.useState('');
+  const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
+
   return (
-    <BoardArea
-      tabIndex={0}
-      onMouseMove={mouseMoveOnBoard}
-      onMouseDown={mouseDownOnBoard}
-      onMouseUp={mouseUpOnBoard}
-      onKeyDown={keyDownOnBoard}
-      onDoubleClick={dblclickBoard}
-    >
-      {cards
-        .map((card, index) => ({ card, zIndex: index }))
-        .slice()
-        // fixed order in the DOM for css transitions to work consistently
-        .sort((a, b) =>
-          a.card.index > b.card.index ? -1 : a.card.index < b.card.index ? 1 : 0
-        )
-        .map(({ card, zIndex }) => (
-          <Card
-            key={card.id}
-            onMouseDown={mouseDownOnCard(card)}
-            onDoubleClick={e => e.stopPropagation()}
-            style={{
-              zIndex,
-              ...BoundsToRectStyle(
-                Bounds.fromRect(card.location, card.dimensions)
-              ),
-              background: card.background,
-              // transform: `translate(${card.location.x}px, ${card.location.y}px) translateZ(0)`,
-              boxShadow: isSelected(card)
-                ? `inset 0px 0px 0px 1px white`
-                : 'none',
-              border: isSelected(card)
-                ? `1px solid ${colors.highlight}`
-                : `1px solid #eeeeee`,
-            }}
+    <>
+      <BoardArea
+        tabIndex={0}
+        onMouseMove={mouseMoveOnBoard}
+        onMouseDown={mouseDownOnBoard}
+        onMouseUp={mouseUpOnBoard}
+        onKeyDown={keyDownOnBoard}
+        onDoubleClick={dblclickBoard}
+      >
+        {cards
+          .map((card, index) => ({ card, zIndex: index }))
+          .slice()
+          // fixed order in the DOM for css transitions to work consistently
+          .sort((a, b) =>
+            a.card.index > b.card.index
+              ? -1
+              : a.card.index < b.card.index
+              ? 1
+              : 0
+          )
+          .map(({ card, zIndex }) => (
+            <Card
+              key={card.id}
+              onMouseDown={mouseDownOnCard(card)}
+              onDoubleClick={e => {
+                e.stopPropagation();
+                setDialogCardId(card.id);
+                setDialogState(card.text);
+              }}
+              style={{
+                zIndex,
+                ...BoundsToRectStyle(
+                  Bounds.fromRect(card.location, card.dimensions)
+                ),
+                background: card.background,
+                // transform: `translate(${card.location.x}px, ${card.location.y}px) translateZ(0)`,
+                boxShadow: isSelected(card)
+                  ? `inset 0px 0px 0px 1px white`
+                  : 'none',
+                border: isSelected(card)
+                  ? `1px solid ${colors.highlight}`
+                  : `1px solid #eeeeee`,
+              }}
+              animate={animate}
+            >
+              {card.text}
+            </Card>
+          ))}
+        {isDragging && dragState.type === 'MARQUEE' && (
+          <Marquee
+            style={BoundsToRectStyle(
+              getMarqueeBounds(dragState.startLocation, dragState.location)
+            )}
+          />
+        )}
+        {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
+          <TransformToolDiv
             animate={animate}
+            style={BoundsToRectStyle(getSelectionBounds())}
           >
-            {card.text}
-          </Card>
-        ))}
-      {isDragging && dragState.type === 'MARQUEE' && (
-        <Marquee
-          style={BoundsToRectStyle(
-            getMarqueeBounds(dragState.startLocation, dragState.location)
-          )}
-        />
-      )}
-      {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
-        <TransformToolDiv
-          animate={animate}
-          style={BoundsToRectStyle(getSelectionBounds())}
-        >
-          {transformTool.handles.map((handle, index) => {
-            const handleStyle = {
-              left: handle.getStyleLeft(),
-              top: handle.getStyleTop(),
-              widht: handle.getSize(),
-              height: handle.getSize(),
-              cursor: handle.getStyleCursor(),
-            };
-            return (
-              <TransformToolHandle
-                animate={animate}
-                draggable={false}
-                key={index}
-                style={handleStyle}
-                onMouseDown={e => {
-                  mouseDownOnHandle(e, handle);
-                }}
-              />
-            );
-          })}
-        </TransformToolDiv>
-      )}
-    </BoardArea>
+            {transformTool.handles.map((handle, index) => {
+              const handleStyle = {
+                left: handle.getStyleLeft(),
+                top: handle.getStyleTop(),
+                widht: handle.getSize(),
+                height: handle.getSize(),
+                cursor: handle.getStyleCursor(),
+              };
+              return (
+                <TransformToolHandle
+                  animate={animate}
+                  draggable={false}
+                  key={index}
+                  style={handleStyle}
+                  onMouseDown={e => {
+                    mouseDownOnHandle(e, handle);
+                  }}
+                />
+              );
+            })}
+          </TransformToolDiv>
+        )}
+      </BoardArea>
+      <DialogStyled
+        isOpen={!!dialogCardId}
+        onDismiss={() => setDialogCardId(null)}
+      >
+        <textarea
+          value={dialogState}
+          onChange={e => setDialogState(e.currentTarget.value)}
+        ></textarea>
+
+        <div className="footer">
+          <button
+            onClick={() => {
+              setDialogCardId(null);
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (dialogCardId) {
+                const c = getCardById(dialogCardId);
+                if (c) {
+                  updateText({
+                    from: c.text,
+                    to: dialogState,
+                    id: dialogCardId,
+                  });
+                }
+              }
+              setDialogCardId(null);
+            }}
+          >
+            Update text
+          </button>
+        </div>
+      </DialogStyled>
+    </>
   );
 };
+
+const DialogStyled = styled(Dialog)`
+  border: 1px solid #eee;
+  z-index: 1;
+  width: 300px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  textarea {
+    resize: none;
+    padding: 8px;
+    margin-bottom: 8px;
+    height: 100px;
+  }
+  .footer {
+    display: flex;
+    justify-content: flex-end;
+    > button {
+      margin-left: 8px;
+      padding: 4px 8px;
+    }
+  }
+`;
 
 const colors = {
   highlight: '#48a7f6',
 };
 
 const BoardArea = styled.div`
+  z-index: 0;
   position: relative;
   outline: none;
   flex: 1;
