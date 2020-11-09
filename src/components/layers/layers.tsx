@@ -99,6 +99,7 @@ const Root = styled.div`
   border-left: 1px solid #aaa;
   height: 100%;
   overflow-y: scroll;
+  flex-shrink: none;
 `;
 
 const Layer = styled.div<{ isSelected: boolean }>`

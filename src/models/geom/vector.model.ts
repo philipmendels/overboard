@@ -10,10 +10,7 @@ export class Vector {
     return new Vector(data.x, data.y);
   }
 
-  public static fromAngleDeg = (
-    deg: number,
-    fixError: boolean = true
-  ): Vector => {
+  public static fromAngleDeg = (deg: number, fixError = true): Vector => {
     if (fixError) {
       deg = GeomUtil.normalizeDeg(deg);
       if (GeomUtil.equals(Math.abs(deg), 90)) {
@@ -26,10 +23,7 @@ export class Vector {
     return Vector.fromAngleRad(rad, false);
   };
 
-  public static fromAngleRad = (
-    rad: number,
-    fixError: boolean = true
-  ): Vector => {
+  public static fromAngleRad = (rad: number, fixError = true): Vector => {
     if (fixError) {
       rad = GeomUtil.normalizeRad(rad);
       if (GeomUtil.equals(Math.abs(rad), GeomUtil.HALF_PI)) {
@@ -105,6 +99,9 @@ export class Vector {
   }
   public max(v: Vector): Vector {
     return new Vector(Math.max(this.x, v.x), Math.max(this.y, v.y));
+  }
+  public min(v: Vector): Vector {
+    return new Vector(Math.min(this.x, v.x), Math.min(this.y, v.y));
   }
   public abs(): Vector {
     return new Vector(Math.abs(this.x), Math.abs(this.y));

@@ -1,6 +1,6 @@
 import styled from '@emotion/styled';
 import { omit } from 'rambda';
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { HandlersByType } from 'use-flexible-undo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
 import { createNewCard, CardData } from '../models/card';
@@ -25,6 +25,7 @@ import { getTransformToolBounds } from './transform-tool/transform.util';
 
 import { Dialog } from '@reach/dialog';
 import '@reach/dialog/styles.css';
+import { usePinch } from 'react-use-gesture';
 
 type CanvasProps = {
   cards: CardData[];
@@ -57,6 +58,23 @@ type DragState =
     };
 
 const transformTool = new TransformTool();
+
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => {
+  console.log('whgesturechangeeelevent');
+  e.preventDefault();
+});
+window.addEventListener(
+  'wheel',
+  event => {
+    // console.log('wheelevent');
+    const { ctrlKey } = event;
+    if (ctrlKey) {
+      event.preventDefault();
+    }
+  },
+  { passive: false }
+);
 
 export const Canvas: React.FC<CanvasProps> = ({
   cards,
@@ -260,8 +278,113 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
+  const [br, setBr] = useState(new Vector(0, 0));
+
+  const [transform, setTransform] = useState({
+    scale: 1,
+    translate: new Vector(0, 0),
+    correctWithScroll: false,
+  });
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  usePinch(
+    state => {
+      if (state.first) {
+        setBr(prev => {
+          const container = containerRef.current;
+          return container
+            ? new Vector(container.scrollWidth, container.scrollHeight)
+            : prev;
+        });
+      }
+      setTransform(({ scale, translate }) => {
+        const newScale = Math.max(
+          0.33,
+          Math.min(3, scale + (state.vdva[0] * scale) / 10)
+        );
+
+        const e = state.event as MouseEvent;
+
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const rect = contentRef.current!.getBoundingClientRect();
+
+        const offset = new Vector(rect.left, rect.top);
+        const globalA = new Vector(e.clientX, e.clientY);
+        const localA = globalA.subtract(offset).divide(scale);
+        const globalB = localA.multiply(newScale).add(offset);
+        const locDiff = globalB.subtract(globalA);
+        const newTranslate = translate.subtract(locDiff);
+        return {
+          scale: newScale,
+          translate: newTranslate,
+          correctWithScroll: state.last,
+        };
+      });
+    },
+    {
+      domTarget: containerRef,
+      eventOptions: { passive: false },
+    }
+  );
+  const { scale, translate, correctWithScroll: fromZoom } = transform;
+
+  const c = new Vector(0, 0).multiply(scale).add(translate);
+
+  const container = containerRef.current;
+
+  const center = new Vector(
+    container ? 0.5 * container.clientWidth : 500,
+    container ? 0.5 * container.clientHeight : 500
+  );
+
+  const c2 = center.add(center.subtract(c));
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (container && fromZoom) {
+      const scrollSize = new Vector(
+        container.scrollWidth,
+        container.scrollHeight
+      );
+      const containerSize = new Vector(
+        container.clientWidth,
+        container.clientHeight
+      );
+      const scrollPos = new Vector(container.scrollLeft, container.scrollTop);
+      const scrollSpace = scrollSize
+        .subtract(containerSize)
+        .subtract(scrollPos);
+
+      const diff = new Vector(
+        translate.x >= 0
+          ? Math.min(scrollPos.x, translate.x)
+          : -Math.min(scrollSpace.x, -translate.x),
+        translate.y >= 0
+          ? Math.min(scrollPos.y, translate.y)
+          : -Math.min(scrollSpace.y, -translate.y)
+      );
+      const newScrollPos = scrollPos.subtract(diff);
+      container.scrollTo({ left: newScrollPos.x, top: newScrollPos.y });
+
+      const newScrollSpace = scrollSize
+        .subtract(containerSize)
+        .subtract(newScrollPos);
+
+      setTransform(({ scale, translate }) => {
+        return {
+          scale,
+          translate: translate.subtract(diff),
+          correctWithScroll: false,
+        };
+      });
+
+      setBr(prev => prev.subtract(newScrollSpace).max(c2));
+    }
+  }, [translate, fromZoom, scale, c2]);
 
   return (
     <>
@@ -272,82 +395,115 @@ export const Canvas: React.FC<CanvasProps> = ({
         onMouseUp={mouseUpOnBoard}
         onKeyDown={keyDownOnBoard}
         onDoubleClick={dblclickBoard}
+        ref={containerRef}
       >
-        {cards
-          .map((card, index) => ({ card, zIndex: index }))
-          .slice()
-          // fixed order in the DOM for css transitions to work consistently
-          .sort((a, b) =>
-            a.card.index > b.card.index
-              ? -1
-              : a.card.index < b.card.index
-              ? 1
-              : 0
-          )
-          .map(({ card, zIndex }) => (
-            <Card
-              key={card.id}
-              onMouseDown={mouseDownOnCard(card)}
-              onDoubleClick={e => {
-                e.stopPropagation();
-                setDialogCardId(card.id);
-                setDialogState(card.text);
-              }}
-              style={{
-                zIndex,
-                ...BoundsToRectStyle(
-                  Bounds.fromRect(card.location, card.dimensions)
-                ),
-                background: card.background,
-                // transform: `translate(${card.location.x}px, ${card.location.y}px) translateZ(0)`,
-                boxShadow: isSelected(card)
-                  ? `inset 0px 0px 0px 1px white`
-                  : 'none',
-                border: isSelected(card)
-                  ? `1px solid ${colors.highlight}`
-                  : `1px solid #eeeeee`,
-              }}
+        <CanvasContent
+          ref={contentRef}
+          style={{
+            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale}, ${scale})`,
+          }}
+        >
+          {cards
+            .map((card, index) => ({ card, zIndex: index }))
+            .slice()
+            // fixed order in the DOM for css transitions to work consistently
+            .sort((a, b) =>
+              a.card.index > b.card.index
+                ? -1
+                : a.card.index < b.card.index
+                ? 1
+                : 0
+            )
+            .map(({ card, zIndex }) => (
+              <Card
+                key={card.id}
+                onMouseDown={mouseDownOnCard(card)}
+                onDoubleClick={e => {
+                  e.stopPropagation();
+                  setDialogCardId(card.id);
+                  setDialogState(card.text);
+                }}
+                style={{
+                  zIndex,
+                  ...BoundsToRectStyle(
+                    Bounds.fromRect(card.location, card.dimensions)
+                  ),
+                  background: card.background,
+                  // transform: `translate(${card.location.x}px, ${card.location.y}px) translateZ(0)`,
+                  boxShadow: isSelected(card)
+                    ? `inset 0px 0px 0px 1px white`
+                    : 'none',
+                  border: isSelected(card)
+                    ? `1px solid ${colors.highlight}`
+                    : `1px solid #eeeeee`,
+                }}
+                animate={animate}
+              >
+                {card.text}
+              </Card>
+            ))}
+          {isDragging && dragState.type === 'MARQUEE' && (
+            <Marquee
+              style={BoundsToRectStyle(
+                getMarqueeBounds(dragState.startLocation, dragState.location)
+              )}
+            />
+          )}
+          {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
+            <TransformToolDiv
               animate={animate}
+              style={BoundsToRectStyle(getSelectionBounds())}
             >
-              {card.text}
-            </Card>
-          ))}
-        {isDragging && dragState.type === 'MARQUEE' && (
-          <Marquee
-            style={BoundsToRectStyle(
-              getMarqueeBounds(dragState.startLocation, dragState.location)
-            )}
-          />
-        )}
-        {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
-          <TransformToolDiv
-            animate={animate}
-            style={BoundsToRectStyle(getSelectionBounds())}
-          >
-            {transformTool.handles.map((handle, index) => {
-              const handleStyle = {
-                left: handle.getStyleLeft(),
-                top: handle.getStyleTop(),
-                widht: handle.getSize(),
-                height: handle.getSize(),
-                cursor: handle.getStyleCursor(),
-              };
-              return (
-                <TransformToolHandle
-                  animate={animate}
-                  draggable={false}
-                  key={index}
-                  style={handleStyle}
-                  onMouseDown={e => {
-                    mouseDownOnHandle(e, handle);
-                  }}
-                />
-              );
-            })}
-          </TransformToolDiv>
-        )}
+              {transformTool.handles.map((handle, index) => {
+                const handleStyle = {
+                  left: handle.getStyleLeft(),
+                  top: handle.getStyleTop(),
+                  widht: handle.getSize(),
+                  height: handle.getSize(),
+                  cursor: handle.getStyleCursor(),
+                };
+                return (
+                  <TransformToolHandle
+                    animate={animate}
+                    draggable={false}
+                    key={index}
+                    style={handleStyle}
+                    onMouseDown={e => {
+                      mouseDownOnHandle(e, handle);
+                    }}
+                  />
+                );
+              })}
+            </TransformToolDiv>
+          )}
+        </CanvasContent>
+        <Point
+          style={{
+            transform: `translate(${br.x}px, ${br.y}px)`,
+            background: 'purple',
+          }}
+        />
+        <Point
+          style={{
+            transform: `translate(${center.x}px, ${center.y}px)`,
+            background: 'orange',
+          }}
+        />
+        <Point
+          style={{
+            transform: `translate(${c.x}px, ${c.y}px)`,
+            background: 'red',
+          }}
+        />
+        <Point
+          style={{
+            transform: `translate(${c2.x}px, ${c2.y}px)`,
+            background: 'green',
+          }}
+        />
       </BoardArea>
       <DialogStyled
+        aria-label="text dialog"
         isOpen={!!dialogCardId}
         onDismiss={() => setDialogCardId(null)}
       >
@@ -419,6 +575,25 @@ const BoardArea = styled.div`
   position: relative;
   outline: none;
   flex: 1;
+  min-width: 0;
+  overflow: auto;
+`;
+
+const Point = styled.div`
+  opacity: 0;
+  pointer-events: none;
+  left: -10px;
+  top: -10px;
+  width: 10px;
+  height: 10px;
+  position: absolute;
+`;
+
+const CanvasContent = styled.div`
+  width: 2000px;
+  height: 1000px;
+  transform-origin: 0 0;
+  position: absolute;
   overflow: hidden;
   background: #eeeeee;
 `;
