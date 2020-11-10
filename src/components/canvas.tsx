@@ -5,7 +5,7 @@ import { HandlersByType } from 'use-flexible-undo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
 import { createNewCard, CardData } from '../models/card';
 import { Bounds } from '../models/geom/bounds.model';
-import { V, Vector, VectorData } from '../models/geom/vector.model';
+import { V, Vector } from '../models/geom/vector.model';
 import {
   MoveActionSelectionState,
   ScaleActionSelectionState,
@@ -76,6 +76,8 @@ window.addEventListener(
   { passive: false }
 );
 
+const scrollBuffer = new Vector(300, 300);
+
 export const Canvas: React.FC<CanvasProps> = ({
   cards,
   undoables,
@@ -105,6 +107,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       Bounds.fromRect(card.location, card.dimensions)
     );
     return Bounds.fromShapes(selectedCardsBoundsArray);
+  };
+
+  const getContentBounds = (): Bounds => {
+    const cardsBoundsArray = cards.map(card =>
+      Bounds.fromRect(card.location, card.dimensions)
+    );
+    return Bounds.fromShapes(cardsBoundsArray);
   };
 
   const getCardById = (id: string) => cards.find(idEquals(id));
@@ -148,6 +157,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.keyCode === 8 || event.keyCode === 46) {
       event.preventDefault();
+      updateBr();
       // backspace and delete
       removeCards(
         getSelectedCards().map(card => ({
@@ -272,7 +282,17 @@ export const Canvas: React.FC<CanvasProps> = ({
       startLocation: location,
       selection: dragSelState,
     });
+
+    updateBr();
   };
+
+  const updateBr = () =>
+    setBr(prev => {
+      const container = containerRef.current;
+      return container
+        ? new Vector(container.scrollWidth, container.scrollHeight)
+        : prev;
+    });
 
   const mouseDownOnHandle = (
     event: React.MouseEvent<HTMLDivElement>,
@@ -304,6 +324,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       startBounds,
       selection: sel,
     });
+
+    updateBr();
   };
 
   const [br, setBr] = useState(new Vector(0, 0));
@@ -322,12 +344,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   usePinch(
     state => {
       if (state.first) {
-        setBr(prev => {
-          const container = containerRef.current;
-          return container
-            ? new Vector(container.scrollWidth, container.scrollHeight)
-            : prev;
-        });
+        updateBr();
       }
       setTransform(({ scale, translate }) => {
         const newScale = Math.max(
@@ -356,7 +373,17 @@ export const Canvas: React.FC<CanvasProps> = ({
   );
   const { scale, translate, correctWithScroll: fromZoom } = transform;
 
-  const c = new Vector(0, 0).multiply(scale).add(translate);
+  const c = getContentBounds()
+    .topLeft()
+    .subtract(scrollBuffer)
+    .multiply(scale)
+    .add(translate);
+
+  const br2 = getContentBounds()
+    .bottomRight()
+    .add(scrollBuffer)
+    .multiply(scale)
+    .add(translate);
 
   const container = containerRef.current;
 
@@ -384,12 +411,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         .subtract(scrollPos);
 
       const diff = new Vector(
-        translate.x >= 0
-          ? Math.min(scrollPos.x, translate.x)
-          : -Math.min(scrollSpace.x, -translate.x),
-        translate.y >= 0
-          ? Math.min(scrollPos.y, translate.y)
-          : -Math.min(scrollSpace.y, -translate.y)
+        c.x >= 0 ? Math.min(scrollPos.x, c.x) : -Math.min(scrollSpace.x, -c.x),
+        c.y >= 0 ? Math.min(scrollPos.y, c.y) : -Math.min(scrollSpace.y, -c.y)
       );
       const newScrollPos = scrollPos.subtract(diff);
       container.scrollTo({ left: newScrollPos.x, top: newScrollPos.y });
@@ -408,7 +431,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       setBr(prev => prev.subtract(newScrollSpace).max(c2));
     }
-  }, [translate, fromZoom, scale, c2]);
+  }, [translate, fromZoom, scale, c2, c]);
 
   return (
     <>
@@ -532,6 +555,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             background: 'green',
           }}
         />
+        <Point
+          style={{
+            transform: `translate(${br2.x}px, ${br2.y}px)`,
+            background: 'blue',
+          }}
+        />
       </BoardArea>
       <DialogStyled
         aria-label="text dialog"
@@ -608,6 +637,7 @@ const BoardArea = styled.div`
   flex: 1;
   min-width: 0;
   overflow: auto;
+  background: #eeeeee;
 `;
 
 const Point = styled.div`
@@ -621,8 +651,8 @@ const Point = styled.div`
 `;
 
 const CanvasContent = styled.div`
-  width: 2000px;
-  height: 1000px;
+  /* width: 2000px;
+  height: 1000px; */
   transform-origin: 0 0;
   position: absolute;
   background: #eeeeee;
