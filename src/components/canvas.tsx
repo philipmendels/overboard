@@ -115,10 +115,34 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     addCard(
-      createNewCard(
-        new Vector(event.nativeEvent.offsetX, event.nativeEvent.offsetY)
-      )
+      createNewCard(globalToLocal(new Vector(event.clientX, event.clientY)))
     );
+  };
+
+  const globalToLocal = (v: Vector): Vector => {
+    const container = containerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      return v
+        .subtract(new Vector(rect.left, rect.top))
+        .add(new Vector(container.scrollLeft, container.scrollTop))
+        .subtract(translate)
+        .divide(scale);
+    }
+    return v;
+  };
+
+  const localToGlobal = (v: Vector, scaleValue = scale): Vector => {
+    const container = containerRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      return v
+        .multiply(scaleValue)
+        .add(translate)
+        .subtract(new Vector(container.scrollLeft, container.scrollTop))
+        .add(new Vector(rect.left, rect.top));
+    }
+    return v;
   };
 
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -144,7 +168,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (hasSelection()) {
       clearSelection();
     }
-    const location = new Vector(event.clientX, event.clientY);
+    const location = globalToLocal(new Vector(event.clientX, event.clientY));
     setDragState({
       type: 'MARQUEE',
       location,
@@ -153,12 +177,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
+    const boardLocation = globalToLocal(
+      new Vector(event.clientX, event.clientY)
+    );
     if (dragState.type !== 'NONE') {
       setIsDragging(true);
     }
     if (dragState.type === 'MARQUEE' || dragState.type === 'CARDS') {
-      setDragState(merge({ location: V(boardLocation) }));
+      setDragState(merge({ location: boardLocation }));
     }
     if (dragState.type === 'CARDS') {
       moveCardsHandler(boardLocation, {
@@ -168,7 +194,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       const ttBounds = getTransformToolBounds({
         startBounds: dragState.startBounds,
         handle: dragState.handle,
-        mouseLocation: V(boardLocation),
+        mouseLocation: boardLocation,
       });
       scaleCardsHandler(ttBounds, {
         selection: dragState.selection,
@@ -178,7 +204,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation: VectorData = { x: event.clientX, y: event.clientY };
+    const boardLocation = globalToLocal(
+      new Vector(event.clientX, event.clientY)
+    );
     if (isDragging) {
       if (dragState.type === 'MARQUEE') {
         const mb = getMarqueeBounds(
@@ -216,7 +244,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     event: React.MouseEvent<HTMLDivElement>
   ): void => {
     event.stopPropagation();
-    const location = new Vector(event.clientX, event.clientY);
+    const location = globalToLocal(new Vector(event.clientX, event.clientY));
 
     const isCardSelected = isSelected(mouseDownCard);
     const newSel = isSelectionKeyDown(event)
@@ -309,15 +337,11 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         const e = state.event as MouseEvent;
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const rect = contentRef.current!.getBoundingClientRect();
-
-        const offset = new Vector(rect.left, rect.top);
         const globalA = new Vector(e.clientX, e.clientY);
-        const localA = globalA.subtract(offset).divide(scale);
-        const globalB = localA.multiply(newScale).add(offset);
-        const locDiff = globalB.subtract(globalA);
-        const newTranslate = translate.subtract(locDiff);
+        const localA = globalToLocal(globalA);
+        const globalB = localToGlobal(localA, newScale);
+        const globalDiff = globalB.subtract(globalA);
+        const newTranslate = translate.subtract(globalDiff);
         return {
           scale: newScale,
           translate: newTranslate,
@@ -444,15 +468,21 @@ export const Canvas: React.FC<CanvasProps> = ({
             ))}
           {isDragging && dragState.type === 'MARQUEE' && (
             <Marquee
-              style={BoundsToRectStyle(
-                getMarqueeBounds(dragState.startLocation, dragState.location)
-              )}
+              style={{
+                ...BoundsToRectStyle(
+                  getMarqueeBounds(dragState.startLocation, dragState.location)
+                ),
+                borderWidth: 1 / scale + 'px',
+              }}
             />
           )}
           {hasSelection() && !(isDragging && dragState.type === 'CARDS') && (
             <TransformToolDiv
               animate={animate}
-              style={BoundsToRectStyle(getSelectionBounds())}
+              style={{
+                ...BoundsToRectStyle(getSelectionBounds()),
+                borderWidth: 1 / scale + 'px',
+              }}
             >
               {transformTool.handles.map((handle, index) => {
                 const handleStyle = {
@@ -461,6 +491,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                   widht: handle.getSize(),
                   height: handle.getSize(),
                   cursor: handle.getStyleCursor(),
+                  transform: `scale(${Math.max(0.5, 1 / scale)})`,
                 };
                 return (
                   <TransformToolHandle
@@ -594,7 +625,6 @@ const CanvasContent = styled.div`
   height: 1000px;
   transform-origin: 0 0;
   position: absolute;
-  overflow: hidden;
   background: #eeeeee;
 `;
 
