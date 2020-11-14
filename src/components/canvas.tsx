@@ -1,6 +1,12 @@
 import styled from '@emotion/styled';
 import { omit } from 'rambda';
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { HandlersByType } from 'use-flexible-undo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
 import { createNewCard, CardData } from '../models/card';
@@ -25,7 +31,7 @@ import { getTransformToolBounds } from './transform-tool/transform.util';
 
 import { Dialog } from '@reach/dialog';
 import '@reach/dialog/styles.css';
-import { usePinch } from 'react-use-gesture';
+import { useGesture } from 'react-use-gesture';
 
 type CanvasProps = {
   cards: CardData[];
@@ -61,13 +67,11 @@ const transformTool = new TransformTool();
 
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('gesturechange', e => {
-  console.log('whgesturechangeeelevent');
   e.preventDefault();
 });
 window.addEventListener(
   'wheel',
   event => {
-    // console.log('wheelevent');
     const { ctrlKey } = event;
     if (ctrlKey) {
       event.preventDefault();
@@ -98,6 +102,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [dragState, setDragState] = useState<DragState>({ type: 'NONE' });
 
   const [isDragging, setIsDragging] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
 
   const getMarqueeBounds = (dragStartLocation: Vector, dragLocation: Vector) =>
     Bounds.fromPoints([dragStartLocation, dragLocation]);
@@ -109,12 +114,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     return Bounds.fromShapes(selectedCardsBoundsArray);
   };
 
-  const getContentBounds = (): Bounds => {
+  const contentBounds = useMemo(() => {
     const cardsBoundsArray = cards.map(card =>
       Bounds.fromRect(card.location, card.dimensions)
     );
     return Bounds.fromShapes(cardsBoundsArray);
-  };
+  }, [cards]);
 
   const getCardById = (id: string) => cards.find(idEquals(id));
 
@@ -157,7 +162,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.keyCode === 8 || event.keyCode === 46) {
       event.preventDefault();
-      updateBr();
       // backspace and delete
       removeCards(
         getSelectedCards().map(card => ({
@@ -282,17 +286,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       startLocation: location,
       selection: dragSelState,
     });
-
-    updateBr();
   };
-
-  const updateBr = () =>
-    setBr(prev => {
-      const container = containerRef.current;
-      return container
-        ? new Vector(container.scrollWidth, container.scrollHeight)
-        : prev;
-    });
 
   const mouseDownOnHandle = (
     event: React.MouseEvent<HTMLDivElement>,
@@ -324,8 +318,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       startBounds,
       selection: sel,
     });
-
-    updateBr();
   };
 
   const [br, setBr] = useState(new Vector(0, 0));
@@ -333,53 +325,59 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [transform, setTransform] = useState({
     scale: 1,
     translate: new Vector(0, 0),
-    correctWithScroll: false,
   });
+
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  usePinch(
-    state => {
-      if (state.first) {
-        updateBr();
-      }
-      setTransform(({ scale, translate }) => {
-        const newScale = Math.max(
-          0.33,
-          Math.min(3, scale + (state.vdva[0] * scale) / 10)
-        );
-
-        const e = state.event as MouseEvent;
-
-        const globalA = new Vector(e.clientX, e.clientY);
-        const localA = globalToLocal(globalA);
-        const globalB = localToGlobal(localA, newScale);
-        const globalDiff = globalB.subtract(globalA);
-        const newTranslate = translate.subtract(globalDiff);
-        return {
-          scale: newScale,
-          translate: newTranslate,
-          correctWithScroll: state.last,
-        };
-      });
+  useGesture(
+    {
+      onPinchStart: () => {
+        setIsZooming(true);
+      },
+      onPinch: state => {
+        if (state.last) {
+          console.log('last');
+          // state.last is same as onPinchEnd
+          setIsZooming(false);
+          // correctScroll(); --> better wait for layoutEffect
+        } else {
+          setTransform(({ scale, translate }) => {
+            const newScale = Math.max(
+              0.33,
+              Math.min(3, scale + (state.vdva[0] * scale) / 10)
+            );
+            const e = state.event as MouseEvent;
+            const globalA = new Vector(e.clientX, e.clientY);
+            const localA = globalToLocal(globalA);
+            const globalB = localToGlobal(localA, newScale);
+            const globalDiff = globalB.subtract(globalA);
+            const newTranslate = translate.subtract(globalDiff);
+            return {
+              scale: newScale,
+              translate: newTranslate,
+            };
+          });
+        }
+      },
     },
     {
       domTarget: containerRef,
       eventOptions: { passive: false },
     }
   );
-  const { scale, translate, correctWithScroll: fromZoom } = transform;
+  const { scale, translate } = transform;
 
-  const c = getContentBounds()
+  const c = contentBounds
     .topLeft()
     .subtract(scrollBuffer)
     .multiply(scale)
     .add(translate);
 
-  const br2 = getContentBounds()
+  const br2 = contentBounds
     .bottomRight()
     .add(scrollBuffer)
     .multiply(scale)
@@ -394,9 +392,10 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const c2 = center.add(center.subtract(c));
 
-  useLayoutEffect(() => {
+  const correctScroll = () => {
+    console.log('cs');
     const container = containerRef.current;
-    if (container && fromZoom) {
+    if (container) {
       const scrollSize = new Vector(
         container.scrollWidth,
         container.scrollHeight
@@ -417,21 +416,61 @@ export const Canvas: React.FC<CanvasProps> = ({
       const newScrollPos = scrollPos.subtract(diff);
       container.scrollTo({ left: newScrollPos.x, top: newScrollPos.y });
 
-      const newScrollSpace = scrollSize
-        .subtract(containerSize)
-        .subtract(newScrollPos);
+      // const newScrollSpace = scrollSize
+      //   .subtract(containerSize)
+      //   .subtract(newScrollPos);
 
       setTransform(({ scale, translate }) => {
         return {
           scale,
           translate: translate.subtract(diff),
-          correctWithScroll: false,
         };
       });
-
-      setBr(prev => prev.subtract(newScrollSpace).max(c2));
+      console.log(diff);
+      // setBr(prev => prev.subtract(newScrollSpace).max(c2).max(br2));
+      // setTimeout(() => updateBr(), 100);
     }
-  }, [translate, fromZoom, scale, c2, c]);
+  };
+
+  const updateBr = () => {
+    const container = containerRef.current;
+    if (!isZooming && container) {
+      console.log('updateBr');
+      const scrollSize = new Vector(
+        container.scrollWidth,
+        container.scrollHeight
+      );
+      const containerSize = new Vector(
+        container.clientWidth,
+        container.clientHeight
+      );
+      const scrollPos = new Vector(container.scrollLeft, container.scrollTop);
+      const scrollSpace = scrollSize
+        .subtract(containerSize)
+        .subtract(scrollPos);
+      setBr(prev => prev.subtract(scrollSpace).max(c2).max(br2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => updateBr(), [translate]);
+
+  useLayoutEffect(() => {
+    console.log('le', isZooming);
+    if (!isZooming) {
+      correctScroll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, isZooming]);
+
+  useLayoutEffect(() => {
+    // console.log('lle', isDragging);
+    if (!isDragging && !isZooming) {
+      correctScroll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentBounds, isDragging]);
 
   return (
     <>
@@ -641,7 +680,7 @@ const BoardArea = styled.div`
 `;
 
 const Point = styled.div`
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
   left: -10px;
   top: -10px;
