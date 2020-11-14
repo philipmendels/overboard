@@ -96,7 +96,7 @@ export const Layers: React.FC<Props> = ({
 
 const Root = styled.div`
   width: 200px;
-  border-left: 1px solid #aaa;
+  border-right: 1px solid #aaa;
   height: 100%;
   overflow-y: scroll;
   flex-shrink: none;

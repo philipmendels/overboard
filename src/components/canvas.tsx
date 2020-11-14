@@ -34,6 +34,16 @@ type CanvasProps = {
   moveCardsHandler: MoveCardsHandler;
   scaleCardsHandler: ScaleCardsHandler;
   animate: boolean;
+  transform: {
+    scale: number;
+    translate: Vector;
+  };
+  setTransform: React.Dispatch<
+    React.SetStateAction<{
+      scale: number;
+      translate: Vector;
+    }>
+  >;
 } & SelectionProps;
 
 type DragState =
@@ -87,6 +97,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   select,
   clearSelection,
   updateSelection,
+  transform,
+  setTransform,
 }) => {
   const isSelected = isItemInSelectionRecord(selection);
 
@@ -323,11 +335,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   // so that no automatic scrolling occurs while zooming out or
   // while dragging inwards / scaling down content.
   const [scrollSizePoint, setScrollSizePoint] = useState(new Vector(0, 0));
-
-  const [transform, setTransform] = useState({
-    scale: 1,
-    translate: new Vector(0, 0),
-  });
 
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);

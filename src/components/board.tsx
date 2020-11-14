@@ -32,6 +32,7 @@ import { Canvas } from './canvas';
 import { describeAction } from './payload-describers';
 import { SelectionProps, StandardSelectionState } from '../models/selection';
 import { Layers } from './layers/layers';
+import { BiLayer, BiHistory, BiZoomIn, BiZoomOut } from 'react-icons/bi';
 
 const initialCards = new Array(10)
   .fill(0)
@@ -141,31 +142,115 @@ export const Board: React.FC = () => {
     updateSelection: s => setSelection(s),
   };
 
+  const [showLayers, setShowLayers] = useState(true);
+  const [showHistory, setShowHistory] = useState(true);
+
+  const [transform, setTransform] = useState({
+    scale: 1,
+    translate: new Vector(0, 0),
+  });
+
   return (
     <Root>
-      <Canvas
-        cards={cards}
-        undoables={undoables}
-        moveCardsHandler={moveCardsHandler}
-        scaleCardsHandler={scaleCardsHandler}
-        animate={animate}
-        {...selectionProps}
-      ></Canvas>
-      <Layers cards={cards} undoables={undoables} {...selectionProps}></Layers>
-      <TimelineArea>
-        <BranchNav
-          history={history}
-          switchToBranch={switchToBranchWithAnimation}
-          undo={undoWithAnimation}
-          redo={redoWithAnimation}
-        ></BranchNav>
-        <ActionList
-          history={history}
-          switchToBranch={switchToBranchWithAnimation}
-          timeTravel={timeTravelWithAnimation}
-          describeAction={describeAction}
-        ></ActionList>
-      </TimelineArea>
+      <MenuBar>
+        <span
+          onClick={() => setShowLayers(prev => !prev)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            color: showLayers ? 'black' : '#aaa',
+            fontWeight: 'bolder',
+          }}
+        >
+          Layers&nbsp;
+          <BiLayer size={20} />
+        </span>
+        <span
+          style={{
+            width: '40px',
+            marginLeft: 'auto',
+            textAlign: 'end',
+          }}
+        >
+          {Math.round(transform.scale * 100)}%
+        </span>
+        &nbsp; &nbsp;
+        <BiZoomIn
+          size={20}
+          onClick={() =>
+            setTransform(({ scale, translate }) => ({
+              scale: Math.min(scale * 1.1, 3),
+              translate,
+            }))
+          }
+          style={{
+            cursor: 'pointer',
+          }}
+        />
+        &nbsp;&nbsp;
+        <BiZoomOut
+          size={20}
+          onClick={() =>
+            setTransform(({ scale, translate }) => ({
+              scale: Math.max(scale / 1.1, 1 / 3),
+              translate,
+            }))
+          }
+          style={{
+            cursor: 'pointer',
+            marginRight: 'auto',
+          }}
+        ></BiZoomOut>
+        <span
+          onClick={() => setShowHistory(prev => !prev)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            color: showHistory ? 'black' : '#aaa',
+            fontWeight: 'bolder',
+          }}
+        >
+          History&nbsp;
+          <BiHistory size={20} />
+        </span>
+      </MenuBar>
+      <Main>
+        {showLayers && (
+          <Layers
+            cards={cards}
+            undoables={undoables}
+            {...selectionProps}
+          ></Layers>
+        )}
+        <Canvas
+          cards={cards}
+          undoables={undoables}
+          moveCardsHandler={moveCardsHandler}
+          scaleCardsHandler={scaleCardsHandler}
+          animate={animate}
+          transform={transform}
+          setTransform={setTransform}
+          {...selectionProps}
+        ></Canvas>
+        {showHistory && (
+          <TimelineArea>
+            <BranchNav
+              history={history}
+              switchToBranch={switchToBranchWithAnimation}
+              undo={undoWithAnimation}
+              redo={redoWithAnimation}
+            ></BranchNav>
+            <ActionList
+              history={history}
+              switchToBranch={switchToBranchWithAnimation}
+              timeTravel={timeTravelWithAnimation}
+              describeAction={describeAction}
+            ></ActionList>
+          </TimelineArea>
+        )}
+      </Main>
     </Root>
   );
 };
@@ -176,13 +261,29 @@ const Root = styled.div`
   width: 100vw;
   height: 100vh;
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   font-family: Verdana, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  user-select: none;
   div {
     box-sizing: border-box;
   }
+`;
+
+const MenuBar = styled.div`
+  flex: 0 0 40px;
+  background: white;
+  border-bottom: 1px solid #aaa;
+  padding: 4px 16px;
+  display: flex;
+  align-items: center;
+`;
+
+const Main = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: stretch;
 `;
 
 const TimelineArea = styled.div`
