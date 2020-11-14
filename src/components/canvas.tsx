@@ -1,12 +1,6 @@
 import styled from '@emotion/styled';
 import { omit } from 'rambda';
-import React, {
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HandlersByType } from 'use-flexible-undo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
 import { createNewCard, CardData } from '../models/card';
@@ -32,6 +26,7 @@ import { getTransformToolBounds } from './transform-tool/transform.util';
 import { Dialog } from '@reach/dialog';
 import '@reach/dialog/styles.css';
 import { useGesture } from 'react-use-gesture';
+import { getScrollVectors } from './canvas.util';
 
 type CanvasProps = {
   cards: CardData[];
@@ -101,6 +96,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const [dragState, setDragState] = useState<DragState>({ type: 'NONE' });
 
+  // isDragging cannot be derived from dragState because dragState
+  // is set on mouseDown and isDragging on first mouseMove. Unless we look
+  // at the cursor delta.
   const [isDragging, setIsDragging] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
 
@@ -251,6 +249,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     }
     setDragState({ type: 'NONE' });
+    // The following triggers scroll correction in an effect:
     setIsDragging(false);
   };
 
@@ -320,7 +319,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  const [br, setBr] = useState(new Vector(0, 0));
+  // Point for temporarily fixing the scrollWidth and scrollHeight of the container
+  // so that no automatic scrolling occurs while zooming out or
+  // while dragging inwards / scaling down content.
+  const [scrollSizePoint, setScrollSizePoint] = useState(new Vector(0, 0));
 
   const [transform, setTransform] = useState({
     scale: 1,
@@ -339,29 +341,30 @@ export const Canvas: React.FC<CanvasProps> = ({
         setIsZooming(true);
       },
       onPinch: state => {
-        if (state.last) {
-          console.log('last');
-          // state.last is same as onPinchEnd
-          setIsZooming(false);
-          // correctScroll(); --> better wait for layoutEffect
-        } else {
-          setTransform(({ scale, translate }) => {
-            const newScale = Math.max(
-              0.33,
-              Math.min(3, scale + (state.vdva[0] * scale) / 10)
-            );
-            const e = state.event as MouseEvent;
-            const globalA = new Vector(e.clientX, e.clientY);
-            const localA = globalToLocal(globalA);
-            const globalB = localToGlobal(localA, newScale);
-            const globalDiff = globalB.subtract(globalA);
-            const newTranslate = translate.subtract(globalDiff);
-            return {
-              scale: newScale,
-              translate: newTranslate,
-            };
-          });
-        }
+        setTransform(({ scale, translate }) => {
+          const newScale = Math.max(
+            0.33,
+            Math.min(3, scale + (state.vdva[0] * scale) / 10)
+          );
+          const e = state.event as MouseEvent;
+
+          // Instead of getting the cursor position on each update
+          // we could store it at pinchStart. But this seems to work ok.
+          const globalA = new Vector(e.clientX, e.clientY);
+          const localA = globalToLocal(globalA);
+          const globalB = localToGlobal(localA, newScale);
+          const globalDiff = globalB.subtract(globalA);
+          const newTranslate = translate.subtract(globalDiff);
+          return {
+            scale: newScale,
+            translate: newTranslate,
+          };
+        });
+      },
+      onPinchEnd: () => {
+        // Correcting scroll while zooming is a bit shaky.
+        // The following will trigger scroll correction in an effect.
+        setIsZooming(false);
       },
     },
     {
@@ -371,13 +374,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   );
   const { scale, translate } = transform;
 
-  const c = contentBounds
+  const contentTopLeftGlobal = contentBounds
     .topLeft()
     .subtract(scrollBuffer)
     .multiply(scale)
     .add(translate);
 
-  const br2 = contentBounds
+  const contentBottomRightGlobal = contentBounds
     .bottomRight()
     .add(scrollBuffer)
     .multiply(scale)
@@ -385,92 +388,97 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const container = containerRef.current;
 
-  const center = new Vector(
+  const containerCenterGlobal = new Vector(
     container ? 0.5 * container.clientWidth : 500,
     container ? 0.5 * container.clientHeight : 500
   );
 
-  const c2 = center.add(center.subtract(c));
+  // Mirror the content top-left over the center of the view,
+  // to ensure there is always enough scroll-space available
+  // to execute the scroll-correction for a negative content
+  // top-left.
+  const contentTopLeftGlobalMirrored = containerCenterGlobal.add(
+    containerCenterGlobal.subtract(contentTopLeftGlobal)
+  );
 
-  const correctScroll = () => {
-    console.log('cs');
+  // The following two effects can be merged, but let's keep them
+  // separate for clarity.
+
+  useLayoutEffect(() => {
+    if (!isDragging && !isZooming) {
+      correctScrollTopLeft();
+    }
+    // This effect should run when setting scale with a discrete
+    // action (e.g. button click) or at the end of a continuous
+    // action (e.g. pinch-to-zoom).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, isZooming]);
+
+  useLayoutEffect(() => {
+    if (!isDragging && !isZooming) {
+      correctScrollTopLeft();
+    }
+    // This effect should run when updating bounds with a discrete
+    // action (e.g. undo / redo) or at the end of a continuous
+    // action (e.g. dragging/scaling content).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentBounds, isDragging]);
+
+  // It is not possibe to scroll to negative values, so we need to
+  // to translate positively and scroll the same amount positively
+  // in order to correct the view. Oppositely, if there is too much
+  // scroll space top-left then we need to translate and scroll
+  // in the negative direction.
+  const correctScrollTopLeft = () => {
     const container = containerRef.current;
     if (container) {
-      const scrollSize = new Vector(
-        container.scrollWidth,
-        container.scrollHeight
-      );
-      const containerSize = new Vector(
-        container.clientWidth,
-        container.clientHeight
-      );
-      const scrollPos = new Vector(container.scrollLeft, container.scrollTop);
-      const scrollSpace = scrollSize
-        .subtract(containerSize)
-        .subtract(scrollPos);
+      const { scrollPos, scrollSpace } = getScrollVectors(container);
 
       const diff = new Vector(
-        c.x >= 0 ? Math.min(scrollPos.x, c.x) : -Math.min(scrollSpace.x, -c.x),
-        c.y >= 0 ? Math.min(scrollPos.y, c.y) : -Math.min(scrollSpace.y, -c.y)
+        contentTopLeftGlobal.x >= 0
+          ? Math.min(scrollPos.x, contentTopLeftGlobal.x)
+          : -Math.min(scrollSpace.x, -contentTopLeftGlobal.x),
+        contentTopLeftGlobal.y >= 0
+          ? Math.min(scrollPos.y, contentTopLeftGlobal.y)
+          : -Math.min(scrollSpace.y, -contentTopLeftGlobal.y)
       );
       const newScrollPos = scrollPos.subtract(diff);
       container.scrollTo({ left: newScrollPos.x, top: newScrollPos.y });
 
-      // const newScrollSpace = scrollSize
-      //   .subtract(containerSize)
-      //   .subtract(newScrollPos);
-
+      // This update of 'translate' will trigger scroll correction
+      // for bottom-right in an effect. Maybe we can do it here directly instead.
       setTransform(({ scale, translate }) => {
         return {
           scale,
           translate: translate.subtract(diff),
         };
       });
-      console.log(diff);
-      // setBr(prev => prev.subtract(newScrollSpace).max(c2).max(br2));
-      // setTimeout(() => updateBr(), 100);
     }
   };
-
-  const updateBr = () => {
-    const container = containerRef.current;
-    if (!isZooming && container) {
-      console.log('updateBr');
-      const scrollSize = new Vector(
-        container.scrollWidth,
-        container.scrollHeight
-      );
-      const containerSize = new Vector(
-        container.clientWidth,
-        container.clientHeight
-      );
-      const scrollPos = new Vector(container.scrollLeft, container.scrollTop);
-      const scrollSpace = scrollSize
-        .subtract(containerSize)
-        .subtract(scrollPos);
-      setBr(prev => prev.subtract(scrollSpace).max(c2).max(br2));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => updateBr(), [translate]);
 
   useLayoutEffect(() => {
-    console.log('le', isZooming);
+    // ignore translation changes due to zooming:
     if (!isZooming) {
-      correctScroll();
+      correctScrollBottomRight();
     }
+    // This effect should run when translate changes due to correctScrollTopLeft();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale, isZooming]);
+  }, [translate]);
 
-  useLayoutEffect(() => {
-    // console.log('lle', isDragging);
-    if (!isDragging && !isZooming) {
-      correctScroll();
+  const correctScrollBottomRight = () => {
+    const container = containerRef.current;
+    if (container) {
+      const { scrollSpace } = getScrollVectors(container);
+      // Cannot simply set scrollSizePoint to the current scrollSize because
+      // the scrollSizePoint influences the scrollSize so it will never get smaller.
+      setScrollSizePoint(prev =>
+        prev
+          .subtract(scrollSpace)
+          .max(contentTopLeftGlobalMirrored)
+          .max(contentBottomRightGlobal)
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentBounds, isDragging]);
+  };
 
   return (
     <>
@@ -572,31 +580,31 @@ export const Canvas: React.FC<CanvasProps> = ({
         </CanvasContent>
         <Point
           style={{
-            transform: `translate(${br.x}px, ${br.y}px)`,
+            transform: `translate(${scrollSizePoint.x}px, ${scrollSizePoint.y}px)`,
             background: 'purple',
           }}
         />
         <Point
           style={{
-            transform: `translate(${center.x}px, ${center.y}px)`,
+            transform: `translate(${containerCenterGlobal.x}px, ${containerCenterGlobal.y}px)`,
             background: 'orange',
           }}
         />
         <Point
           style={{
-            transform: `translate(${c.x}px, ${c.y}px)`,
+            transform: `translate(${contentTopLeftGlobal.x}px, ${contentTopLeftGlobal.y}px)`,
             background: 'red',
           }}
         />
         <Point
           style={{
-            transform: `translate(${c2.x}px, ${c2.y}px)`,
+            transform: `translate(${contentTopLeftGlobalMirrored.x}px, ${contentTopLeftGlobalMirrored.y}px)`,
             background: 'green',
           }}
         />
         <Point
           style={{
-            transform: `translate(${br2.x}px, ${br2.y}px)`,
+            transform: `translate(${contentBottomRightGlobal.x}px, ${contentBottomRightGlobal.y}px)`,
             background: 'blue',
           }}
         />
@@ -680,7 +688,7 @@ const BoardArea = styled.div`
 `;
 
 const Point = styled.div`
-  opacity: 1;
+  opacity: 0;
   pointer-events: none;
   left: -10px;
   top: -10px;
@@ -690,8 +698,6 @@ const Point = styled.div`
 `;
 
 const CanvasContent = styled.div`
-  /* width: 2000px;
-  height: 1000px; */
   transform-origin: 0 0;
   position: absolute;
   background: #eeeeee;
