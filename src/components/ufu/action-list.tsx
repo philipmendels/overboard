@@ -43,10 +43,10 @@ export const ActionList = <PBT extends PayloadByType>({
     <div
       style={{
         position: 'relative',
-        padding: '16px',
-        width: '100%',
-        flex: 1,
+        flex: '1 1 0',
+        minHeight: 0,
         overflow: 'auto',
+        padding: '16px',
       }}
     >
       {stack
@@ -68,28 +68,9 @@ export const ActionList = <PBT extends PayloadByType>({
             switchToBranch={switchToBranch}
           />
         ))}
-
-      <Indicator
-        style={{ top: 20 + (stack.length - currentIndex - 1) * 32 + 'px' }}
-      >
-        &#11157;
-      </Indicator>
     </div>
   );
 };
-
-const Indicator = styled.div`
-  height: 32px;
-  display: flex;
-  align-items: center;
-  color: #48a7f6;
-  font-size: 16px;
-  opacity: 0.8;
-  position: absolute;
-  left: 46px;
-  border-radius: 50%;
-  transition: all 0.3s ease-in-out;
-`;
 
 interface StackItemProps<PBT extends PayloadByType> {
   action: HistoryItemUnion<PBT>;
@@ -116,8 +97,8 @@ const StackItem = <PBT extends PayloadByType>({
       <div
         style={{
           color: '#48a7f6',
-          padding: '8px 0',
-          flex: '0 0 52px',
+          padding: '8px 0 0 ',
+          flex: '0 0 20px',
         }}
       >
         {connections.length > 0 ? (
@@ -207,7 +188,7 @@ const MenuItemStyled = styled(MenuItem)`
 `;
 
 const StackItemContent = styled.div<{ isCurrent: boolean }>`
-  padding: 8px;
+  padding: 8px 16px;
   display: flex;
   &:hover {
     background: #f7f8fa;

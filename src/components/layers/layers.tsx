@@ -95,10 +95,10 @@ export const Layers: React.FC<Props> = ({
 };
 
 const Root = styled.div`
-  width: 200px;
+  width: 250px;
   border-right: 1px solid #aaa;
   height: 100%;
-  overflow-y: scroll;
+  overflow: auto;
   flex-shrink: none;
 `;
 

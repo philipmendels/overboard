@@ -51,7 +51,12 @@ export const BranchNav = <PBT extends PayloadByType>({
       >
         <ListboxButton arrow={<TriangleDownIcon size={16} />} />
         <ListboxPopover
-          style={{ padding: 0, border: 0, outline: 'none', zIndex: 2 }}
+          style={{
+            padding: 0,
+            border: 0,
+            outline: 'none',
+            zIndex: 2,
+          }}
         >
           <ListboxListStyled>
             {branchList.map(b => (
@@ -64,41 +69,40 @@ export const BranchNav = <PBT extends PayloadByType>({
                   b.parent
                     ? b.parent.position.globalIndex + b.stack.length + 1
                     : b.stack.length
-                }, last-modified ${formatTime(
-                  getLastItem(b.stack).created,
-                  now
-                )})`}
+                }, ${formatTime(getLastItem(b.stack).created, now)})`}
               </ListboxOptionStyled>
             ))}
           </ListboxListStyled>
         </ListboxPopover>
       </ListboxStyled>
-      <button disabled={!canUndo} onClick={() => undo()}>
-        undo
-        <span
-          style={{
-            display: 'inline-block',
-            marginLeft: '8px',
-            transform: 'rotate(-90deg) scale(1.5)',
-            opacity: 0.5,
-          }}
-        >
-          &#9100;
-        </span>
-      </button>
-      <button disabled={!canRedo} onClick={() => redo()}>
-        <span
-          style={{
-            display: 'inline-block',
-            marginRight: '8px',
-            transform: 'rotate(90deg) scale(1.5)',
-            opacity: 0.5,
-          }}
-        >
-          &#9100;
-        </span>
-        redo
-      </button>
+      <Buttons>
+        <button disabled={!canUndo} onClick={() => undo()}>
+          undo
+          <span
+            style={{
+              display: 'inline-block',
+              marginLeft: '8px',
+              transform: 'rotate(-90deg) scale(1.5)',
+              opacity: 0.5,
+            }}
+          >
+            &#9100;
+          </span>
+        </button>
+        <button disabled={!canRedo} onClick={() => redo()}>
+          <span
+            style={{
+              display: 'inline-block',
+              marginRight: '8px',
+              transform: 'rotate(90deg) scale(1.5)',
+              opacity: 0.5,
+            }}
+          >
+            &#9100;
+          </span>
+          redo
+        </button>
+      </Buttons>
     </Root>
   );
 };
@@ -106,12 +110,11 @@ export const BranchNav = <PBT extends PayloadByType>({
 const Root = styled.div`
   padding: 16px;
   border-bottom: 1px solid #aaa;
-  display: flex;
   flex-shrink: 0;
-  overflow: scroll;
+  display: flex;
+  flex-direction: column;
   button {
     font-size: 14px;
-    margin-right: 10px;
     padding: 4px 8px;
     border-radius: 2px;
     font-family: Verdana, sans-serif;
@@ -132,15 +135,26 @@ const Root = styled.div`
   }
 `;
 
+const Buttons = styled.div`
+  display: flex;
+  margin-top: 16px;
+  justify-content: space-between;
+  > button {
+    flex: 1 1 0;
+    &:first-child {
+      margin-right: 16px;
+    }
+  }
+`;
+
 const ListboxStyled = styled(ListboxInput)`
-  display: inline-block;
-  margin-right: 10px;
   [data-reach-listbox-button] {
+    box-sizing: border-box;
+    width: 100%;
+    height: 30px;
     background: white;
     padding: 4px 8px;
     font-size: 14px;
-    height: 19px;
-    min-width: 183px;
     border-radius: 2px;
     border-color: #aaa;
     cursor: pointer;
@@ -168,6 +182,7 @@ const ListboxOptionStyled = styled(ListboxOption)`
   cursor: pointer;
   padding: 8px 16px;
   border: 0;
+  max-width: 100%;
   &[aria-selected='true'] {
     background: #f7f8fa;
     color: black;

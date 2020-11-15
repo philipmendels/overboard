@@ -281,13 +281,15 @@ const MenuBar = styled.div`
 `;
 
 const Main = styled.div`
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   align-items: stretch;
+  position: relative;
 `;
 
 const TimelineArea = styled.div`
-  width: 450px;
+  width: 300px;
   flex-shrink: 0;
   border-left: 1px solid #aaa;
   user-select: none;
