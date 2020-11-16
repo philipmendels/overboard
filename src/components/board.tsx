@@ -2,7 +2,7 @@ import * as React from 'react';
 import * as R from 'rambda';
 import styled from '@emotion/styled';
 import { Vector, V } from '../models/geom/vector.model';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createNewCard, minCardSize } from '../models/card';
 import {
   concatArray,
@@ -33,6 +33,7 @@ import { describeAction } from './payload-describers';
 import { SelectionProps, StandardSelectionState } from '../models/selection';
 import { Layers } from './layers/layers';
 import { BiLayer, BiHistory, BiZoomIn, BiZoomOut } from 'react-icons/bi';
+import { globalToLocal, localToGlobal } from './canvas.util';
 
 const initialCards = new Array(10)
   .fill(0)
@@ -150,6 +151,32 @@ export const Board: React.FC = () => {
     translate: new Vector(0, 0),
   });
 
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const zoom = (direction: 'in' | 'out') => {
+    setTransform(({ scale, translate }) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { scale, translate };
+      const newScale =
+        direction === 'in'
+          ? Math.min(scale * 1.1, 3)
+          : Math.max(scale / 1.1, 1 / 3);
+      const rect = canvas.getBoundingClientRect();
+      const globalA = new Vector(
+        rect.left + 0.5 * rect.width,
+        rect.top + 0.5 * rect.height
+      );
+      const localA = globalToLocal(globalA, canvasRef, translate, scale);
+      const globalB = localToGlobal(localA, canvasRef, translate, newScale);
+      const globalDiff = globalB.subtract(globalA);
+      const newTranslate = translate.subtract(globalDiff);
+      return {
+        scale: newScale,
+        translate: newTranslate,
+      };
+    });
+  };
+
   return (
     <Root>
       <MenuBar>
@@ -178,12 +205,9 @@ export const Board: React.FC = () => {
         &nbsp; &nbsp;
         <BiZoomIn
           size={20}
-          onClick={() =>
-            setTransform(({ scale, translate }) => ({
-              scale: Math.min(scale * 1.1, 3),
-              translate,
-            }))
-          }
+          onClick={() => {
+            zoom('in');
+          }}
           style={{
             cursor: 'pointer',
           }}
@@ -191,12 +215,7 @@ export const Board: React.FC = () => {
         &nbsp;&nbsp;
         <BiZoomOut
           size={20}
-          onClick={() =>
-            setTransform(({ scale, translate }) => ({
-              scale: Math.max(scale / 1.1, 1 / 3),
-              translate,
-            }))
-          }
+          onClick={() => zoom('out')}
           style={{
             cursor: 'pointer',
             marginRight: 'auto',
@@ -232,6 +251,7 @@ export const Board: React.FC = () => {
           animate={animate}
           transform={transform}
           setTransform={setTransform}
+          containerRef={canvasRef}
           {...selectionProps}
         ></Canvas>
         {showHistory && (

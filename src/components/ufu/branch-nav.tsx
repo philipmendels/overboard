@@ -141,7 +141,7 @@ const Buttons = styled.div`
   justify-content: space-between;
   > button {
     flex: 1 1 0;
-    &:first-child {
+    &:first-of-type {
       margin-right: 16px;
     }
   }

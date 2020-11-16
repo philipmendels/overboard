@@ -26,7 +26,7 @@ import { getTransformToolBounds } from './transform-tool/transform.util';
 import { Dialog } from '@reach/dialog';
 import '@reach/dialog/styles.css';
 import { useGesture } from 'react-use-gesture';
-import { getScrollVectors } from './canvas.util';
+import { getScrollVectors, globalToLocal, localToGlobal } from './canvas.util';
 
 type CanvasProps = {
   cards: CardData[];
@@ -44,6 +44,7 @@ type CanvasProps = {
       translate: Vector;
     }>
   >;
+  containerRef: React.RefObject<HTMLDivElement>;
 } & SelectionProps;
 
 type DragState =
@@ -99,6 +100,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   updateSelection,
   transform,
   setTransform,
+  containerRef,
 }) => {
   const isSelected = isItemInSelectionRecord(selection);
 
@@ -139,35 +141,15 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const dblclickBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
     addCard(
-      createNewCard(globalToLocal(new Vector(event.clientX, event.clientY)))
+      createNewCard(globalToLocal2(new Vector(event.clientX, event.clientY)))
     );
   };
 
-  const globalToLocal = (v: Vector): Vector => {
-    const container = containerRef.current;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      return v
-        .subtract(new Vector(rect.left, rect.top))
-        .add(new Vector(container.scrollLeft, container.scrollTop))
-        .subtract(translate)
-        .divide(scale);
-    }
-    return v;
-  };
+  const globalToLocal2 = (v: Vector) =>
+    globalToLocal(v, containerRef, translate, scale);
 
-  const localToGlobal = (v: Vector, scaleValue = scale): Vector => {
-    const container = containerRef.current;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      return v
-        .multiply(scaleValue)
-        .add(translate)
-        .subtract(new Vector(container.scrollLeft, container.scrollTop))
-        .add(new Vector(rect.left, rect.top));
-    }
-    return v;
-  };
+  const localToGlobal2 = (v: Vector, scaleValue = scale) =>
+    localToGlobal(v, containerRef, translate, scaleValue);
 
   const keyDownOnBoard = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.keyCode === 8 || event.keyCode === 46) {
@@ -192,7 +174,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (hasSelection()) {
       clearSelection();
     }
-    const location = globalToLocal(new Vector(event.clientX, event.clientY));
+    const location = globalToLocal2(new Vector(event.clientX, event.clientY));
     setDragState({
       type: 'MARQUEE',
       location,
@@ -201,7 +183,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const mouseMoveOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation = globalToLocal(
+    const boardLocation = globalToLocal2(
       new Vector(event.clientX, event.clientY)
     );
     if (dragState.type !== 'NONE') {
@@ -228,7 +210,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const mouseUpOnBoard = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const boardLocation = globalToLocal(
+    const boardLocation = globalToLocal2(
       new Vector(event.clientX, event.clientY)
     );
     if (isDragging) {
@@ -269,7 +251,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     event: React.MouseEvent<HTMLDivElement>
   ): void => {
     event.stopPropagation();
-    const location = globalToLocal(new Vector(event.clientX, event.clientY));
+    const location = globalToLocal2(new Vector(event.clientX, event.clientY));
 
     const isCardSelected = isSelected(mouseDownCard);
     const newSel = isSelectionKeyDown(event)
@@ -339,7 +321,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useGesture(
@@ -358,8 +340,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           // Instead of getting the cursor position on each update
           // we could store it at pinchStart. But this seems to work ok.
           const globalA = new Vector(e.clientX, e.clientY);
-          const localA = globalToLocal(globalA);
-          const globalB = localToGlobal(localA, newScale);
+          const localA = globalToLocal2(globalA);
+          const globalB = localToGlobal2(localA, newScale);
           const globalDiff = globalB.subtract(globalA);
           const newTranslate = translate.subtract(globalDiff);
           return {

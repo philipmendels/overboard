@@ -10,7 +10,7 @@ import {
   BranchSwitchModus,
 } from 'use-flexible-undo';
 import { GitBranchIcon, DotIcon } from '@primer/octicons-react';
-import { getCurrentBranch, getCurrentIndex, getSideBranches } from './helpers';
+import { getCurrentBranch, getSideBranches } from './helpers';
 import { formatTime, useInterval } from './util';
 
 type ConvertFn<PBT extends PayloadByType> = (
@@ -35,7 +35,6 @@ export const ActionList = <PBT extends PayloadByType>({
 
   const currentBranch = getCurrentBranch(history);
   const stack = currentBranch.stack;
-  const currentIndex = getCurrentIndex(history);
 
   const connections = getSideBranches(currentBranch.id, true)(history);
 
