@@ -27,6 +27,8 @@ import { Dialog } from '@reach/dialog';
 import '@reach/dialog/styles.css';
 import { useGesture } from 'react-use-gesture';
 import { getScrollVectors, globalToLocal, localToGlobal } from './canvas.util';
+import useResizeObserver from 'use-resize-observer';
+import _ from 'lodash';
 
 type CanvasProps = {
   cards: CardData[];
@@ -86,7 +88,7 @@ window.addEventListener(
   { passive: false }
 );
 
-const scrollBuffer = new Vector(300, 300);
+const scrollBuffer = new Vector(500, 500);
 
 export const Canvas: React.FC<CanvasProps> = ({
   cards,
@@ -321,8 +323,43 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
 
-  // const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const prevOffsetRef = useRef<Vector | null>(null);
+
+  const resizeEnd = useMemo(
+    () => _.debounce(() => setIsResizing(false), 1000, { leading: false }),
+    []
+  );
+
+  const [isResizing, setIsResizing] = useState(false);
+
+  const getOffset = (container: HTMLElement) => {
+    const rect = container.getBoundingClientRect();
+    const scrollPos = new Vector(container.scrollLeft, container.scrollTop);
+    return new Vector(rect.left, rect.top).subtract(scrollPos);
+  };
+
+  useResizeObserver<HTMLDivElement>({
+    ref: containerRef,
+    onResize: () => {
+      setIsResizing(true);
+      const container = containerRef.current;
+      if (container) {
+        const offset = getOffset(container);
+        const prevOffset = prevOffsetRef.current;
+        if (prevOffset) {
+          const diff = offset.subtract(prevOffset);
+          setTransform(({ scale, translate }) => ({
+            scale,
+            translate: translate.subtract(diff),
+          }));
+        }
+        prevOffsetRef.current = offset;
+      }
+      resizeEnd();
+    },
+  });
 
   useGesture(
     {
@@ -354,6 +391,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Correcting scroll while zooming is a bit shaky.
         // The following will trigger scroll correction in an effect.
         setIsZooming(false);
+      },
+      onScrollEnd: () => {
+        const container = containerRef.current;
+        if (container) {
+          prevOffsetRef.current = getOffset(container);
+        }
       },
     },
     {
@@ -394,14 +437,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   // separate for clarity.
 
   useLayoutEffect(() => {
-    if (!isDragging && !isZooming) {
+    if (!isDragging && !isZooming && !isResizing) {
       correctScrollTopLeft();
     }
     // This effect should run when setting scale with a discrete
     // action (e.g. button click) or at the end of a continuous
-    // action (e.g. pinch-to-zoom).
+    // action (e.g. pinch-to-zoom, container resize).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale, isZooming]);
+  }, [scale, isZooming, isResizing]);
 
   useLayoutEffect(() => {
     if (!isDragging && !isZooming) {
