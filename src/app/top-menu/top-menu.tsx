@@ -4,6 +4,8 @@ import { BiLayer, BiZoomIn, BiZoomOut, BiHistory } from 'react-icons/bi';
 import { Vector } from '../geom/vector.model';
 import { globalToLocal, localToGlobal } from '../board/board.util';
 import { TransformProps } from '../board/board';
+import { Menu, MenuPopover, MenuButton } from '@reach/menu-button';
+import { cardBgColors } from '../card/card';
 
 type BooleanDispatch = React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -12,6 +14,7 @@ export type TopMenuProps = TransformProps & {
   setShowLayers: BooleanDispatch;
   showHistory: boolean;
   setShowHistory: BooleanDispatch;
+  updateColor: (color: string) => void;
 };
 
 export const TopMenu: FC<TopMenuProps> = ({
@@ -22,6 +25,7 @@ export const TopMenu: FC<TopMenuProps> = ({
   setShowHistory,
   showLayers,
   setShowLayers,
+  updateColor,
 }) => {
   const zoom = (direction: 'in' | 'out') => {
     setTransform(({ scale, translate }) => {
@@ -71,6 +75,21 @@ export const TopMenu: FC<TopMenuProps> = ({
       <ZoomInButton size={20} onClick={() => zoom('in')} />
       &nbsp;&nbsp;
       <ZoomOutButton size={20} onClick={() => zoom('out')} />
+      <div style={{ marginLeft: '32px', marginRight: 'auto' }}>
+        <Menu>
+          <MenuButton>colors</MenuButton>
+          <MenuPopover>
+            <CardPropsPanel>
+              {cardBgColors.map(color => (
+                <div
+                  onClick={() => updateColor(color)}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </CardPropsPanel>
+          </MenuPopover>
+        </Menu>
+      </div>
       <IconButton
         onClick={() => setShowHistory(prev => !prev)}
         active={showHistory}
@@ -91,6 +110,23 @@ const MenuBar = styled.div`
   align-items: center;
 `;
 
+const CardPropsPanel = styled.div`
+  background: white;
+  border: 1px solid #aaa;
+  padding: 8px;
+  > div {
+    margin: 4px;
+    display: inline-block;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    transition: scale 0.3s ease-in-out;
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+`;
+
 const ZoomLevel = styled.span`
   width: 40px;
   margin-left: auto;
@@ -103,7 +139,6 @@ const ZoomInButton = styled(BiZoomIn)`
 
 const ZoomOutButton = styled(BiZoomOut)`
   cursor: pointer;
-  margin-right: auto;
 `;
 
 const IconButton = styled.span<{ active: boolean }>`

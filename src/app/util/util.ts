@@ -1,6 +1,6 @@
 import { Bounds } from '../geom/bounds.model';
 import { css } from '@emotion/core';
-import { SelectionState, StandardSelectionState } from '../actions/selection';
+import { StandardSelectionState } from '../actions/selection';
 import * as R from 'rambda';
 
 type ObjMap<V> = Record<string, V>;
@@ -215,7 +215,11 @@ export const isItemInSelectionRecord = (selection: Record<string, unknown>) => <
   item: T
 ) => selection[item.id] !== undefined;
 
-export const updateIfSelected = <S extends SelectionState, T extends ObjWithId>(
+export const updateIfSelected = <
+  U extends unknown,
+  S extends Record<string, U>,
+  T extends ObjWithId
+>(
   selection: S,
   whenTrueFn: (a: T) => T
 ) => R.map(R.when(isItemInSelectionRecord(selection), whenTrueFn));

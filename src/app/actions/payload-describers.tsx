@@ -48,6 +48,13 @@ const payloadDescribers: PayloadDescribers = {
       <ActionType>Update text</ActionType> '{to.slice(0, 16)}...'
     </>
   ),
+  updateColor: ({ to, selection }) => (
+    <>
+      <ActionType>Change color</ActionType> of{' '}
+      {getCardsString(Object.values(selection).length)} to{' '}
+      <ColorBlock style={{ background: to }} />
+    </>
+  ),
 };
 
 const ActionType = styled.span`
@@ -62,3 +69,10 @@ export const describeAction = ({
 }: HistoryItemUnion<PBT>): ReactNode =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type === 'start' ? 'Start' : (payloadDescribers[type] as any)(payload);
+
+const ColorBlock = styled.div`
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: text-bottom;
+`;

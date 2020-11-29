@@ -15,9 +15,14 @@ import {
   merge,
   valueToKV,
   updateSomeInArray,
+  reduceSelection,
 } from './util/util';
 import { Bounds } from './geom/bounds.model';
-import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
+import {
+  makeUndoableHandler,
+  useUndoableEffects,
+  combineHandlers,
+} from 'use-flexible-undo';
 import { makeUndoableFTXHandler } from './actions/action-util';
 import { ActionList } from './history/action-list';
 import { BranchNav } from './history/branch-nav';
@@ -115,6 +120,22 @@ export const App: React.FC = () => {
       ),
       reorderCard: makeUndoableFTXHandler(reorderCardHandler),
       updateText: makeUndoableFTXHandler(updateTextHandler),
+      updateColor: combineHandlers(
+        ({ selection, to }) =>
+          setCards(
+            updateIfSelected(selection, card => ({
+              ...card,
+              background: to,
+            }))
+          ),
+        ({ selection }) =>
+          setCards(
+            updateIfSelected(selection, card => ({
+              ...card,
+              background: selection[card.id],
+            }))
+          )
+      ),
     },
   });
 
@@ -158,12 +179,26 @@ export const App: React.FC = () => {
     boardContainerRef,
   };
 
+  const hasSelection = () => !!Object.values(selection).length;
+  const getCardById = (id: string) => cards.find(idEquals(id));
+
   const topMenuProps: TopMenuProps = {
     ...transformProps,
     showLayers,
     setShowLayers,
     showHistory,
     setShowHistory,
+    updateColor: color => {
+      if (hasSelection()) {
+        undoables.updateColor({
+          selection: reduceSelection(
+            selection,
+            id => getCardById(id)?.background || ''
+          ),
+          to: color,
+        });
+      }
+    },
   };
 
   const boardProps: BoardProps = {

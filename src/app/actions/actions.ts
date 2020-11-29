@@ -22,6 +22,10 @@ export interface PBT {
   }[];
   reorderCard: PayloadFromTo<number> & IdRest;
   updateText: PayloadFromTo<string> & IdRest;
+  updateColor: {
+    selection: Record<string, string>;
+    to: string;
+  };
 }
 
 export type MoveCardsHandler = (to: VectorData, rest: MovePayloadRest) => void;

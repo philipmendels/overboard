@@ -15,7 +15,7 @@ const defaultCardSize = new Vector(120, 90);
 
 export const minCardSize = new Vector(20, 20);
 
-const colors = [
+export const cardBgColors = [
   '#7550F5',
   '#2F87F7',
   '#4FBFF9',
@@ -32,5 +32,5 @@ export const createNewCard = (vector: Vector): CardData => ({
   text: randomText(),
   location: Vector.fromData(vector).subtract(defaultCardSize.multiply(0.5)),
   dimensions: defaultCardSize.clone(),
-  background: colors[Math.floor(Math.random() * colors.length)],
+  background: cardBgColors[Math.floor(Math.random() * cardBgColors.length)],
 });
