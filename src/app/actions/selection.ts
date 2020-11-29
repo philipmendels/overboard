@@ -1,4 +1,4 @@
-import { Vector } from './geom/vector.model';
+import { Vector } from '../geom/vector.model';
 
 interface MoveActionItemState {
   locationRel: Vector;

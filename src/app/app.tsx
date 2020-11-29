@@ -1,9 +1,9 @@
 import * as React from 'react';
 import * as R from 'rambda';
 import styled from '@emotion/styled';
-import { Vector, V } from '../models/geom/vector.model';
+import { Vector, V } from './geom/vector.model';
 import { useEffect, useRef, useState } from 'react';
-import { createNewCard, minCardSize } from '../models/card';
+import { createNewCard, minCardSize } from './card/card';
 import {
   concatArray,
   filterArrayById,
@@ -15,25 +15,24 @@ import {
   merge,
   valueToKV,
   updateSomeInArray,
-} from '../util/util';
-import { Bounds } from '../models/geom/bounds.model';
+} from './util/util';
+import { Bounds } from './geom/bounds.model';
 import { makeUndoableHandler, useUndoableEffects } from 'use-flexible-undo';
-import { makeUndoableFTXHandler } from '../util/action-util';
-import { ActionList } from './ufu/action-list';
-import { BranchNav } from './ufu/branch-nav';
+import { makeUndoableFTXHandler } from './actions/action-util';
+import { ActionList } from './history/action-list';
+import { BranchNav } from './history/branch-nav';
 import {
   PBT,
   MoveCardsHandler,
   ScaleCardsHandler,
   ReorderCardHandler,
   UpdateTextHandler,
-} from '../models/actions';
-import { Canvas } from './canvas';
-import { describeAction } from './payload-describers';
-import { SelectionProps, StandardSelectionState } from '../models/selection';
+} from './actions/actions';
+import { Board, TransformProps, BoardProps } from './board/board';
+import { describeAction } from './actions/payload-describers';
+import { SelectionProps, StandardSelectionState } from './actions/selection';
 import { Layers } from './layers/layers';
-import { BiLayer, BiHistory, BiZoomIn, BiZoomOut } from 'react-icons/bi';
-import { globalToLocal, localToGlobal } from './canvas.util';
+import { TopMenu, TopMenuProps } from './top-menu/top-menu';
 
 const initialCards = new Array(10)
   .fill(0)
@@ -43,7 +42,7 @@ const initialCards = new Array(10)
     )
   );
 
-export const Board: React.FC = () => {
+export const App: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
   const [selection, setSelection] = useState<StandardSelectionState>({});
 
@@ -151,90 +150,35 @@ export const Board: React.FC = () => {
     translate: new Vector(0, 0),
   });
 
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const boardContainerRef = useRef<HTMLDivElement>(null);
 
-  const zoom = (direction: 'in' | 'out') => {
-    setTransform(({ scale, translate }) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return { scale, translate };
-      const newScale =
-        direction === 'in'
-          ? Math.min(scale * 1.1, 3)
-          : Math.max(scale / 1.1, 1 / 3);
-      const rect = canvas.getBoundingClientRect();
-      const globalA = new Vector(
-        rect.left + 0.5 * rect.width,
-        rect.top + 0.5 * rect.height
-      );
-      const localA = globalToLocal(globalA, canvasRef, translate, scale);
-      const globalB = localToGlobal(localA, canvasRef, translate, newScale);
-      const globalDiff = globalB.subtract(globalA);
-      const newTranslate = translate.subtract(globalDiff);
-      return {
-        scale: newScale,
-        translate: newTranslate,
-      };
-    });
+  const transformProps: TransformProps = {
+    transform,
+    setTransform,
+    boardContainerRef,
+  };
+
+  const topMenuProps: TopMenuProps = {
+    ...transformProps,
+    showLayers,
+    setShowLayers,
+    showHistory,
+    setShowHistory,
+  };
+
+  const boardProps: BoardProps = {
+    ...transformProps,
+    ...selectionProps,
+    animate,
+    cards,
+    moveCardsHandler,
+    scaleCardsHandler,
+    undoables,
   };
 
   return (
     <Root>
-      <MenuBar>
-        <span
-          onClick={() => setShowLayers(prev => !prev)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            color: showLayers ? 'black' : '#aaa',
-            fontWeight: 'bolder',
-          }}
-        >
-          Layers&nbsp;
-          <BiLayer size={20} />
-        </span>
-        <span
-          style={{
-            width: '40px',
-            marginLeft: 'auto',
-            textAlign: 'end',
-          }}
-        >
-          {Math.round(transform.scale * 100)}%
-        </span>
-        &nbsp; &nbsp;
-        <BiZoomIn
-          size={20}
-          onClick={() => {
-            zoom('in');
-          }}
-          style={{
-            cursor: 'pointer',
-          }}
-        />
-        &nbsp;&nbsp;
-        <BiZoomOut
-          size={20}
-          onClick={() => zoom('out')}
-          style={{
-            cursor: 'pointer',
-            marginRight: 'auto',
-          }}
-        ></BiZoomOut>
-        <span
-          onClick={() => setShowHistory(prev => !prev)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            color: showHistory ? 'black' : '#aaa',
-            fontWeight: 'bolder',
-          }}
-        >
-          History&nbsp;
-          <BiHistory size={20} />
-        </span>
-      </MenuBar>
+      <TopMenu {...topMenuProps} />
       <Main>
         {showLayers && (
           <Layers
@@ -243,17 +187,7 @@ export const Board: React.FC = () => {
             {...selectionProps}
           ></Layers>
         )}
-        <Canvas
-          cards={cards}
-          undoables={undoables}
-          moveCardsHandler={moveCardsHandler}
-          scaleCardsHandler={scaleCardsHandler}
-          animate={animate}
-          transform={transform}
-          setTransform={setTransform}
-          containerRef={canvasRef}
-          {...selectionProps}
-        ></Canvas>
+        <Board {...boardProps}></Board>
         {showHistory && (
           <TimelineArea>
             <BranchNav
@@ -289,15 +223,6 @@ const Root = styled.div`
   div {
     box-sizing: border-box;
   }
-`;
-
-const MenuBar = styled.div`
-  flex: 0 0 40px;
-  background: white;
-  border-bottom: 1px solid #aaa;
-  padding: 4px 16px;
-  display: flex;
-  align-items: center;
 `;
 
 const Main = styled.div`

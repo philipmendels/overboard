@@ -1,4 +1,4 @@
-import { Vector } from '../models/geom/vector.model';
+import { Vector } from '../geom/vector.model';
 
 export const getScrollVectors = (container: HTMLDivElement) => {
   const scrollSize = new Vector(container.scrollWidth, container.scrollHeight);

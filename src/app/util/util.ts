@@ -1,6 +1,6 @@
-import { Bounds } from '../models/geom/bounds.model';
+import { Bounds } from '../geom/bounds.model';
 import { css } from '@emotion/core';
-import { SelectionState, StandardSelectionState } from '../models/selection';
+import { SelectionState, StandardSelectionState } from '../actions/selection';
 import * as R from 'rambda';
 
 type ObjMap<V> = Record<string, V>;

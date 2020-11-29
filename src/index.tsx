@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { Board } from './components/board';
+import { App } from './app/app';
 
-var mountNode = document.getElementById('app');
-ReactDOM.render(<Board />, mountNode);
+const mountNode = document.getElementById('app');
+ReactDOM.render(<App />, mountNode);

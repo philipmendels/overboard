@@ -1,7 +1,7 @@
 import { PayloadFromTo } from 'use-flexible-undo';
-import { CardData } from './card';
-import { BoundsData } from './geom/bounds.model';
-import { VectorData } from './geom/vector.model';
+import { CardData } from '../card/card';
+import { BoundsData } from '../geom/bounds.model';
+import { VectorData } from '../geom/vector.model';
 import {
   MoveActionSelectionState,
   ScaleActionSelectionState,

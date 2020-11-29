@@ -4,14 +4,17 @@ Example repo for using the library [use-flexible-undo](https://github.com/philip
 
 Play with the board [here](https://philipmendels.github.io/overboard/).
 
-Work in progress. Current functionality:
+Desktop only. No touch support yet.
 
-- multi-select (marquee or CMD / CTRL / SHIFT)
+- multi-select (drag marquee or CMD / CTRL / SHIFT click)
 - add card (double-click board)
 - remove cards (DEL / BACKSPACE)
 - move cards
 - scale cards
 - reorder cards / change z-order
+- update text (double-click card)
+- focal-point zooming (touchpad pinch-to-zoom or ctrl + wheel)
+- standard native scrolling + automatic canvas resize based on content bounds
 
 <br/>
 <img src="https://github.com/philipmendels/overboard/raw/master/assets/overboard-2.gif"/>

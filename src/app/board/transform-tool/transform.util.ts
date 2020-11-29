@@ -1,5 +1,5 @@
-import { Bounds } from '../../models/geom/bounds.model';
-import { Vector } from '../../models/geom/vector.model';
+import { Bounds } from '../../geom/bounds.model';
+import { Vector } from '../../geom/vector.model';
 import { TransformHandle } from './transform-handle.model';
 
 interface Props {

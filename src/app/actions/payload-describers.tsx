@@ -2,9 +2,9 @@ import styled from '@emotion/styled';
 import React from 'react';
 import { ReactNode } from 'react';
 import { HistoryItemUnion } from 'use-flexible-undo';
-import { PBT } from '../models/actions';
-import { Bounds } from '../models/geom/bounds.model';
-import { V } from '../models/geom/vector.model';
+import { PBT } from './actions';
+import { Bounds } from '../geom/bounds.model';
+import { V } from '../geom/vector.model';
 
 type PayloadDescribers = {
   [K in keyof PBT]: (payload: PBT[K]) => ReactNode;

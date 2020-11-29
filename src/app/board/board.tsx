@@ -2,15 +2,15 @@ import styled from '@emotion/styled';
 import { omit } from 'rambda';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { HandlersByType } from 'use-flexible-undo';
-import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../models/actions';
-import { createNewCard, CardData } from '../models/card';
-import { Bounds } from '../models/geom/bounds.model';
-import { V, Vector } from '../models/geom/vector.model';
+import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../actions/actions';
+import { createNewCard, CardData } from '../card/card';
+import { Bounds } from '../geom/bounds.model';
+import { V, Vector } from '../geom/vector.model';
 import {
   MoveActionSelectionState,
   ScaleActionSelectionState,
   SelectionProps,
-} from '../models/selection';
+} from '../actions/selection';
 import {
   idEquals,
   BoundsToRectStyle,
@@ -23,31 +23,31 @@ import { TransformHandle } from './transform-tool/transform-handle.model';
 import { TransformTool } from './transform-tool/transform-tool.model';
 import { getTransformToolBounds } from './transform-tool/transform.util';
 
-import { Dialog } from '@reach/dialog';
-import '@reach/dialog/styles.css';
 import { useGesture } from 'react-use-gesture';
-import { getScrollVectors, globalToLocal, localToGlobal } from './canvas.util';
+import { getScrollVectors, globalToLocal, localToGlobal } from './board.util';
 import useResizeObserver from 'use-resize-observer';
 import _ from 'lodash';
+import { CardDialog } from './card-dialog';
+import { ScrollPoints } from './scroll-points';
 
-type CanvasProps = {
+interface Transform {
+  scale: number;
+  translate: Vector;
+}
+export interface TransformProps {
+  boardContainerRef: React.RefObject<HTMLDivElement>;
+  transform: Transform;
+  setTransform: React.Dispatch<React.SetStateAction<Transform>>;
+}
+
+export type BoardProps = {
   cards: CardData[];
   undoables: HandlersByType<PBT>;
   moveCardsHandler: MoveCardsHandler;
   scaleCardsHandler: ScaleCardsHandler;
   animate: boolean;
-  transform: {
-    scale: number;
-    translate: Vector;
-  };
-  setTransform: React.Dispatch<
-    React.SetStateAction<{
-      scale: number;
-      translate: Vector;
-    }>
-  >;
-  containerRef: React.RefObject<HTMLDivElement>;
-} & SelectionProps;
+} & TransformProps &
+  SelectionProps;
 
 type DragState =
   | {
@@ -90,7 +90,7 @@ window.addEventListener(
 
 const scrollBuffer = new Vector(500, 500);
 
-export const Canvas: React.FC<CanvasProps> = ({
+export const Board: React.FC<BoardProps> = ({
   cards,
   undoables,
   moveCardsHandler,
@@ -102,7 +102,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   updateSelection,
   transform,
   setTransform,
-  containerRef,
+  boardContainerRef: containerRef,
 }) => {
   const isSelected = isItemInSelectionRecord(selection);
 
@@ -322,6 +322,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const [dialogState, setDialogState] = React.useState('');
   const [dialogCardId, setDialogCardId] = React.useState<string | null>(null);
+  const hideDialog = () => setDialogCardId(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -610,100 +611,36 @@ export const Canvas: React.FC<CanvasProps> = ({
             </TransformToolDiv>
           )}
         </CanvasContent>
-        <Point
-          style={{
-            transform: `translate(${scrollSizePoint.x}px, ${scrollSizePoint.y}px)`,
-            background: 'purple',
-          }}
-        />
-        <Point
-          style={{
-            transform: `translate(${containerCenterGlobal.x}px, ${containerCenterGlobal.y}px)`,
-            background: 'orange',
-          }}
-        />
-        <Point
-          style={{
-            transform: `translate(${contentTopLeftGlobal.x}px, ${contentTopLeftGlobal.y}px)`,
-            background: 'red',
-          }}
-        />
-        <Point
-          style={{
-            transform: `translate(${contentTopLeftGlobalMirrored.x}px, ${contentTopLeftGlobalMirrored.y}px)`,
-            background: 'green',
-          }}
-        />
-        <Point
-          style={{
-            transform: `translate(${contentBottomRightGlobal.x}px, ${contentBottomRightGlobal.y}px)`,
-            background: 'blue',
-          }}
+        <ScrollPoints
+          containerCenterGlobal={containerCenterGlobal}
+          contentBottomRightGlobal={contentBottomRightGlobal}
+          contentTopLeftGlobal={contentTopLeftGlobal}
+          contentTopLeftGlobalMirrored={contentTopLeftGlobalMirrored}
+          scrollSizePoint={scrollSizePoint}
         />
       </BoardArea>
-      <DialogStyled
-        aria-label="text dialog"
+      <CardDialog
         isOpen={!!dialogCardId}
-        onDismiss={() => setDialogCardId(null)}
-      >
-        <textarea
-          value={dialogState}
-          onChange={e => setDialogState(e.currentTarget.value)}
-        ></textarea>
-
-        <div className="footer">
-          <button
-            onClick={() => {
-              setDialogCardId(null);
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              if (dialogCardId) {
-                const c = getCardById(dialogCardId);
-                if (c) {
-                  updateText({
-                    from: c.text,
-                    to: dialogState,
-                    id: dialogCardId,
-                  });
-                }
-              }
-              setDialogCardId(null);
-            }}
-          >
-            Update text
-          </button>
-        </div>
-      </DialogStyled>
+        textClone={dialogState}
+        onChange={setDialogState}
+        onCancel={hideDialog}
+        onSubmit={() => {
+          if (dialogCardId) {
+            const c = getCardById(dialogCardId);
+            if (c && c.text !== dialogState) {
+              updateText({
+                from: c.text,
+                to: dialogState,
+                id: dialogCardId,
+              });
+            }
+          }
+          hideDialog();
+        }}
+      />
     </>
   );
 };
-
-const DialogStyled = styled(Dialog)`
-  border: 1px solid #eee;
-  z-index: 1;
-  width: 300px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  textarea {
-    resize: none;
-    padding: 8px;
-    margin-bottom: 8px;
-    height: 100px;
-  }
-  .footer {
-    display: flex;
-    justify-content: flex-end;
-    > button {
-      margin-left: 8px;
-      padding: 4px 8px;
-    }
-  }
-`;
 
 const colors = {
   highlight: '#48a7f6',
@@ -717,16 +654,6 @@ const BoardArea = styled.div`
   min-width: 0;
   overflow: auto;
   background: #eeeeee;
-`;
-
-const Point = styled.div`
-  opacity: 0;
-  pointer-events: none;
-  left: -10px;
-  top: -10px;
-  width: 10px;
-  height: 10px;
-  position: absolute;
 `;
 
 const CanvasContent = styled.div`

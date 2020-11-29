@@ -1,5 +1,5 @@
-import { Direction, Orientation } from '../../models/geom/direction.enum';
-import { DirectionMapItem } from '../../models/geom/direction-map-item';
+import { Direction, Orientation } from '../../geom/direction.enum';
+import { DirectionMapItem } from '../../geom/direction-map-item';
 
 export class TransformHandle {
   constructor(readonly data: DirectionMapItem) {}

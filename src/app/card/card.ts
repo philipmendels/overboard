@@ -1,4 +1,4 @@
-import { VectorData, Vector } from './geom/vector.model';
+import { VectorData, Vector } from '../geom/vector.model';
 import { randomText } from '../util/random-text';
 import { v4 } from 'uuid';
 

@@ -11,7 +11,7 @@ import {
 } from 'use-flexible-undo';
 import { GitBranchIcon, DotIcon } from '@primer/octicons-react';
 import { getCurrentBranch, getSideBranches } from './helpers';
-import { formatTime, useInterval } from './util';
+import { formatTime, useInterval } from './history.util';
 
 type ConvertFn<PBT extends PayloadByType> = (
   action: HistoryItemUnion<PBT>

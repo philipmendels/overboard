@@ -6,11 +6,11 @@ import {
   DropResult,
 } from 'react-beautiful-dnd';
 import styled from '@emotion/styled';
-import { handleSelection, isItemInSelectionRecord } from '../../util/util';
+import { handleSelection, isItemInSelectionRecord } from '../util/util';
 import { HandlersByType } from 'use-flexible-undo';
-import { PBT } from '../../models/actions';
-import { CardData } from '../../models/card';
-import { SelectionProps } from '../../models/selection';
+import { PBT } from '../actions/actions';
+import { CardData } from '../card/card';
+import { SelectionProps } from '../actions/selection';
 
 type Props = {
   cards: CardData[];

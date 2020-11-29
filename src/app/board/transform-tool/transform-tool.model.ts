@@ -1,4 +1,4 @@
-import { DirectionMap } from '../../models/geom/direction.enum';
+import { DirectionMap } from '../../geom/direction.enum';
 import { TransformHandle } from './transform-handle.model';
 
 export class TransformTool {
