@@ -19,7 +19,7 @@
     "@reach/listbox": "^0.11.2",
     "@reach/menu-button": "^0.11.2",
     "eslint": "^7.11.0",
-    "lodash-es": "^4.17.15",
+    "lodash-es": "^4.17.21",
     "rambda": "^6.2.0",
     "react": "^16.13.1",
     "react-beautiful-dnd": "^13.0.0",
