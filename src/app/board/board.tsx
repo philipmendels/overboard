@@ -26,7 +26,7 @@ import { getTransformToolBounds } from './transform-tool/transform.util';
 import { useGesture } from 'react-use-gesture';
 import { getScrollVectors, globalToLocal, localToGlobal } from './board.util';
 import useResizeObserver from 'use-resize-observer';
-import _ from 'lodash';
+import _ from 'lodash-es';
 import { CardDialog } from './card-dialog';
 import { ScrollPoints } from './scroll-points';
 

@@ -18,7 +18,7 @@ export const radDegFactor = 180 / Math.PI;
 export const radToDeg = (rad: number): number => {
   return rad * radDegFactor;
 };
-export const angleDegToSlope = (deg: number, fixError: boolean = true) => {
+export const angleDegToSlope = (deg: number, fixError = true) => {
   if (fixError) {
     deg = normalizeDeg(deg);
     if (equals(Math.abs(deg), 90)) {
@@ -31,10 +31,7 @@ export const angleDegToSlope = (deg: number, fixError: boolean = true) => {
   const rad = degToRad(deg);
   return angleRadToSlope(rad, false);
 };
-export const angleRadToSlope = (
-  rad: number,
-  fixError: boolean = true
-): number => {
+export const angleRadToSlope = (rad: number, fixError = true): number => {
   if (fixError) {
     rad = normalizeRad(rad);
     if (equals(Math.abs(rad), HALF_PI)) {

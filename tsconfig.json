@@ -1,16 +1,13 @@
 {
+  "include": ["src/**/*"],
   "compilerOptions": {
-    "outDir": "./dist/",
-    "sourceMap": true,
-    "strict": true,
-    "noImplicitReturns": true,
-    "noImplicitAny": true,
-    "module": "es6",
-    "moduleResolution": "node",
-    "target": "esnext",
-    "allowJs": true,
-    "jsx": "react",
-    "allowSyntheticDefaultImports": true
-  },
-  "include": ["./src/**/*"]
+    "moduleResolution": "Node",
+    "target": "es2021",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@emotion/react",
+    "isolatedModules": true /* needed for parcel */,
+    "strict": true /* Enable all strict type-checking options. */,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  }
 }

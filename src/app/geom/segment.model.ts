@@ -48,7 +48,7 @@ export class Segment implements ILine, IShape {
   public line(): Line {
     return new Line(this.slope(), this.constant());
   }
-  public lineG(normalize: boolean = true): LineG {
+  public lineG(normalize = true): LineG {
     let delta;
     if (normalize) {
       delta = this.unit();

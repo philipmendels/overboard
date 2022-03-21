@@ -1,5 +1,5 @@
 import { Bounds } from '../geom/bounds.model';
-import { css } from '@emotion/core';
+import { css } from '@emotion/react';
 import { StandardSelectionState } from '../actions/selection';
 import * as R from 'rambda';
 
@@ -216,7 +216,7 @@ export const isItemInSelectionRecord = (selection: Record<string, unknown>) => <
 ) => selection[item.id] !== undefined;
 
 export const updateIfSelected = <
-  U extends unknown,
+  U,
   S extends Record<string, U>,
   T extends ObjWithId
 >(

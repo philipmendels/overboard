@@ -44,6 +44,7 @@ export class LineG implements ILine {
   }
   public intersectLine(line: LineG): Vector | undefined {
     // using homogeneous coordinates
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const l1 = this;
     const l2 = line;
     const z: number = l1.a * l2.b - l2.a * l1.b;

@@ -23,8 +23,7 @@ export const useInterval = (
   }, [delay]);
 };
 
-export const getLastItem = <T extends unknown>(array: T[]) =>
-  array[array.length - 1];
+export const getLastItem = <T>(array: T[]) => array[array.length - 1];
 
 export const formatTime = (created: Date, now: Date): string => {
   const diffSecs = (now.getTime() - created.getTime()) / 1000;
