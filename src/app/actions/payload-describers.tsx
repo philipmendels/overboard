@@ -1,30 +1,36 @@
 import styled from '@emotion/styled';
 import React from 'react';
 import { ReactNode } from 'react';
-import { HistoryItemUnion } from 'use-flexible-undo';
+import {
+  HistoryPayload,
+  HistoryItemUnion,
+  PayloadConfigByType,
+} from 'undomundo';
 import { PBT } from './actions';
 import { Bounds } from '../geom/bounds.model';
 import { V } from '../geom/vector.model';
 
-type PayloadDescribers = {
-  [K in keyof PBT]: (payload: PBT[K]) => ReactNode;
+type PayloadDescribers<PBT2 extends PayloadConfigByType> = {
+  [K in keyof PBT2]: (
+    payload: HistoryPayload<PBT2[K]['payload'], PBT2[K]['isRelative']>
+  ) => ReactNode;
 };
 
-const payloadDescribers: PayloadDescribers = {
-  moveCards: ({ from, to, selection }) => (
+const payloadDescribers: PayloadDescribers<PBT> = {
+  moveCards: ({ undo, redo, selection }) => (
     <>
       <ActionType>Move</ActionType>{' '}
       {getCardsString(Object.values(selection).length)} by{' '}
-      {V(to).subtract(V(from)).toRoundedString()}
+      {V(redo).subtract(V(undo)).toRoundedString()}
     </>
   ),
-  scaleCards: ({ from, to, selection }) => (
+  scaleCards: ({ undo, redo, selection }) => (
     <>
       <ActionType>Scale</ActionType>{' '}
       {getCardsString(Object.values(selection).length)} by{' '}
-      {Bounds.fromData(to)
+      {Bounds.fromData(redo)
         .dimensions()
-        .divideByVector(Bounds.fromData(from).dimensions())
+        .divideByVector(Bounds.fromData(undo).dimensions())
         .toRoundedString(2)}
     </>
   ),
@@ -38,14 +44,14 @@ const payloadDescribers: PayloadDescribers = {
       <ActionType>Remove</ActionType> {getCardsString(items.length)}
     </>
   ),
-  reorderCard: ({ from, to }) => (
+  reorderCard: ({ undo, redo }) => (
     <>
-      <ActionType>Reorder</ActionType> card from index {from} to {to}
+      <ActionType>Reorder</ActionType> card from index {undo} to {redo}
     </>
   ),
-  updateText: ({ to }) => (
+  updateText: ({ redo }) => (
     <>
-      <ActionType>Update text</ActionType> '{to.slice(0, 16)}...'
+      <ActionType>Update text</ActionType> '{redo.slice(0, 16)}...'
     </>
   ),
   updateColor: ({ to, selection }) => (
@@ -67,8 +73,7 @@ export const describeAction = ({
   type,
   payload,
 }: HistoryItemUnion<PBT>): ReactNode =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type === 'start' ? 'Start' : (payloadDescribers[type] as any)(payload);
+  (payloadDescribers[type] as any)(payload);
 
 const ColorBlock = styled.div`
   display: inline-block;

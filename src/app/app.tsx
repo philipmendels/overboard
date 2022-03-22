@@ -3,6 +3,7 @@ import * as R from 'rambda';
 import styled from '@emotion/styled';
 import { Vector, V } from './geom/vector.model';
 import { useEffect, useRef, useState } from 'react';
+import { AbsolutePayload } from 'undomundo';
 import { createNewCard, minCardSize } from './card/card';
 import {
   concatArray,
@@ -18,12 +19,7 @@ import {
   reduceSelection,
 } from './util/util';
 import { Bounds } from './geom/bounds.model';
-import {
-  makeUndoableHandler,
-  useUndoableEffects,
-  combineHandlers,
-} from 'use-flexible-undo';
-import { makeUndoableFTXHandler } from './actions/action-util';
+import { useFlexibleUndo } from 'use-flexible-undo';
 import { ActionList } from './history/action-list';
 import { BranchNav } from './history/branch-nav';
 import {
@@ -38,6 +34,7 @@ import { describeAction } from './actions/payload-describers';
 import { SelectionProps, StandardSelectionState } from './actions/selection';
 import { Layers } from './layers/layers';
 import { TopMenu, TopMenuProps } from './top-menu/top-menu';
+import { CustomBranchData } from './history/types';
 
 const initialCards = new Array(10)
   .fill(0)
@@ -46,6 +43,15 @@ const initialCards = new Array(10)
       new Vector(100 + Math.random() * 600, 100 + Math.random() * 600)
     )
   );
+
+const invertPayload = <P, A extends { payload: AbsolutePayload<P> }>({
+  payload: { undo, redo, ...rest },
+  ...rest2
+}: A) =>
+  ({
+    ...rest2,
+    payload: { ...rest, undo: redo, redo: undo },
+  } as A);
 
 export const App: React.FC = () => {
   const [cards, setCards] = useState(initialCards);
@@ -61,17 +67,17 @@ export const App: React.FC = () => {
     setSelection(R.omit(ids));
   };
 
-  const moveCardsHandler: MoveCardsHandler = (to, { selection }) => {
+  const moveCardsHandler: MoveCardsHandler = ({ redo, selection }) => {
     setCards(
       updateIfSelected(selection, card => ({
         ...card,
-        location: V(to).add(selection[card.id].locationRel),
+        location: V(redo).add(selection[card.id].locationRel),
       }))
     );
   };
 
-  const scaleCardsHandler: ScaleCardsHandler = (boundsData, { selection }) => {
-    const bounds = Bounds.fromData(boundsData);
+  const scaleCardsHandler: ScaleCardsHandler = ({ redo, selection }) => {
+    const bounds = Bounds.fromData(redo);
     const dimensions = bounds.dimensions();
 
     setCards(
@@ -86,17 +92,17 @@ export const App: React.FC = () => {
     );
   };
 
-  const reorderCardHandler: ReorderCardHandler = (toIndex, { id }) => {
+  const reorderCardHandler: ReorderCardHandler = ({ redo, id }) => {
     setCards(cards => {
       const clone = cards.slice();
       const [removed] = clone.splice(cards.findIndex(idEquals(id)), 1);
-      clone.splice(toIndex, 0, removed);
+      clone.splice(redo, 0, removed);
       return clone;
     });
   };
 
-  const updateTextHandler: UpdateTextHandler = (text, { id }) => {
-    setCards(updateSomeInArray(idEquals(id), merge({ text })));
+  const updateTextHandler: UpdateTextHandler = ({ redo, id }) => {
+    setCards(updateSomeInArray(idEquals(id), merge({ text: redo })));
   };
 
   const {
@@ -106,36 +112,64 @@ export const App: React.FC = () => {
     history,
     timeTravel,
     switchToBranch,
-  } = useUndoableEffects<PBT>({
-    handlers: {
-      moveCards: makeUndoableFTXHandler(moveCardsHandler),
-      scaleCards: makeUndoableFTXHandler(scaleCardsHandler),
-      addCard: makeUndoableHandler(setCards)(concatArray, filterArrayById),
-      removeCards: makeUndoableHandler(setCards)(
-        payload => filterArrayByIds(payload.map(({ card }) => card)),
-        payload =>
-          addByIndex(
-            payload.map(({ index, card }) => ({ index, element: card }))
-          )
-      ),
-      reorderCard: makeUndoableFTXHandler(reorderCardHandler),
-      updateText: makeUndoableFTXHandler(updateTextHandler),
-      updateColor: combineHandlers(
-        ({ selection, to }) =>
+  } = useFlexibleUndo<PBT, CustomBranchData>({
+    actionConfigs: {
+      moveCards: {
+        updateState: moveCardsHandler,
+        makeActionForUndo: invertPayload,
+      },
+      scaleCards: {
+        updateState: scaleCardsHandler,
+        makeActionForUndo: invertPayload,
+      },
+      addCard: {
+        updateState: payload => setCards(concatArray(payload)),
+        updateStateOnUndo: payload => setCards(filterArrayById(payload)),
+        makeActionForUndo: R.identity,
+      },
+      removeCards: {
+        updateState: payload =>
+          setCards(filterArrayByIds(payload.map(({ card }) => card))),
+        updateStateOnUndo: payload =>
+          setCards(
+            addByIndex(
+              payload.map(({ index, card }) => ({ index, element: card }))
+            )
+          ),
+        makeActionForUndo: R.identity,
+      },
+      reorderCard: {
+        updateState: reorderCardHandler,
+        makeActionForUndo: invertPayload,
+      },
+      updateText: {
+        updateState: updateTextHandler,
+        makeActionForUndo: invertPayload,
+      },
+      updateColor: {
+        updateState: ({ selection, to }) =>
           setCards(
             updateIfSelected(selection, card => ({
               ...card,
               background: to,
             }))
           ),
-        ({ selection }) =>
+        updateStateOnUndo: ({ selection }) =>
           setCards(
             updateIfSelected(selection, card => ({
               ...card,
               background: selection[card.id],
             }))
-          )
-      ),
+          ),
+        makeActionForUndo: R.identity,
+      },
+    },
+    initBranchData: history => ({
+      name: `Branch ${history.stats.branchCounter + 1}`,
+      number: history.stats.branchCounter + 1,
+    }),
+    options: {
+      useBranchingHistory: true,
     },
   });
 

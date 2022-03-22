@@ -82,6 +82,7 @@ export const TopMenu: FC<TopMenuProps> = ({
             <CardPropsPanel>
               {cardBgColors.map(color => (
                 <div
+                  key={color}
                   onClick={() => updateColor(color)}
                   style={{ backgroundColor: color }}
                 />

@@ -1,4 +1,4 @@
-import React, { ReactElement, useState } from 'react';
+import { ReactElement, useState } from 'react';
 import styled from '@emotion/styled';
 import {
   ListboxInput,
@@ -10,35 +10,38 @@ import {
 import '@reach/listbox/styles.css';
 import { TriangleDownIcon } from '@primer/octicons-react';
 
-import { PayloadByType, BranchSwitchModus, History } from 'use-flexible-undo';
+import {
+  BranchSwitchModus,
+  History,
+  getCurrentBranch,
+  canUndo,
+  canRedo,
+} from 'undomundo';
 import { getLastItem, formatTime, useInterval } from './history.util';
-import { getCurrentBranch, isUndoPossible, isRedoPossible } from './helpers';
+import { CustomBranchData } from './types';
+import { PBT } from '../actions/actions';
 
-interface BranchNavProps<PBT extends PayloadByType> {
-  history: History<PBT>;
+interface BranchNavProps {
+  history: History<PBT, CustomBranchData>;
   switchToBranch: (branchId: string, travelTo?: BranchSwitchModus) => void;
   undo: () => void;
   redo: () => void;
 }
 
-export const BranchNav = <PBT extends PayloadByType>({
+export const BranchNav = ({
   history,
   switchToBranch,
   undo,
   redo,
-}: BranchNavProps<PBT>): ReactElement | null => {
+}: BranchNavProps): ReactElement | null => {
   const [now, setNow] = useState(new Date());
   useInterval(() => setNow(new Date()), 5000);
   const branchList = Object.values(history.branches).sort(
     (a, b) =>
-      getLastItem(b.stack).created.getTime() -
-      getLastItem(a.stack).created.getTime()
+      new Date(getLastItem(b.stack)?.created ?? b.created).getTime() -
+      new Date(getLastItem(a.stack)?.created ?? b.created).getTime()
   );
   const currentBranch = getCurrentBranch(history);
-
-  const canUndo = isUndoPossible(history);
-
-  const canRedo = isRedoPossible(history);
 
   return (
     <Root>
@@ -63,20 +66,23 @@ export const BranchNav = <PBT extends PayloadByType>({
               <ListboxOptionStyled
                 key={b.id}
                 value={b.id}
-                label={`branch ${b.number}`}
+                label={b.custom.name}
               >
-                {`branch ${b.number} (size ${
-                  b.parent
-                    ? b.parent.position.globalIndex + b.stack.length + 1
+                {`branch ${b.custom.name} (size ${
+                  b.parentConnection
+                    ? b.parentConnection.globalIndex + b.stack.length + 1
                     : b.stack.length
-                }, ${formatTime(getLastItem(b.stack).created, now)})`}
+                }, ${formatTime(
+                  new Date(getLastItem(b.stack)?.created ?? b.created),
+                  now
+                )})`}
               </ListboxOptionStyled>
             ))}
           </ListboxListStyled>
         </ListboxPopover>
       </ListboxStyled>
       <Buttons>
-        <button disabled={!canUndo} onClick={() => undo()}>
+        <button disabled={!canUndo(history)} onClick={() => undo()}>
           undo
           <span
             style={{
@@ -89,7 +95,7 @@ export const BranchNav = <PBT extends PayloadByType>({
             &#9100;
           </span>
         </button>
-        <button disabled={!canRedo} onClick={() => redo()}>
+        <button disabled={!canRedo(history)} onClick={() => redo()}>
           <span
             style={{
               display: 'inline-block',

@@ -1,38 +1,23 @@
-import { PayloadByType, BranchConnection, History } from 'use-flexible-undo';
+import { History, Branch } from 'undomundo';
+import { PBT } from '../actions/actions';
+import { CustomBranchData } from './types';
 
-export const getCurrentBranch = <PBT extends PayloadByType>(
-  prev: History<PBT>
-) => prev.branches[prev.currentBranchId];
-
-export const getCurrentIndex = <PBT extends PayloadByType>(
-  prev: History<PBT>
-) => prev.currentPosition.globalIndex;
-
-export const isUndoPossible = <PBT extends PayloadByType>(
-  history: History<PBT>
-) => getCurrentIndex(history) > 0;
-
-export const isRedoPossible = <PBT extends PayloadByType>(
-  history: History<PBT>
-) => {
-  const index = getCurrentIndex(history);
-  const stack = getCurrentBranch(history).stack;
-  return index < stack.length - 1;
+export type BranchConnection = {
+  globalIndex: number;
+  branches: Branch<PBT, CustomBranchData>[];
 };
 
-export const getSideBranches = (branchId: string, flatten: boolean) => <
-  PBT extends PayloadByType
->(
-  history: History<PBT>
-): BranchConnection<PBT>[] =>
+export const getSideBranches = (branchId: string, flatten: boolean) => (
+  history: History<PBT, CustomBranchData>
+): BranchConnection[] =>
   Object.values(history.branches)
-    .filter(b => b.parent?.branchId === branchId)
+    .filter(b => b.parentConnection?.branchId === branchId)
     .map(b => {
       const flattenedBranches = flatten
         ? getSideBranches(b.id, true)(history).flatMap(con => con.branches)
         : [];
       return {
-        position: b.parent!.position,
+        globalIndex: b.parentConnection!.globalIndex,
         branches: [b, ...flattenedBranches],
       };
     });

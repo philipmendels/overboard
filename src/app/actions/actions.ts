@@ -1,4 +1,3 @@
-import { PayloadFromTo } from 'use-flexible-undo';
 import { CardData } from '../card/card';
 import { BoundsData } from '../geom/bounds.model';
 import { VectorData } from '../geom/vector.model';
@@ -7,33 +6,46 @@ import {
   ScaleActionSelectionState,
 } from './selection';
 
+import { RelativePayloadConfig, AbsolutePayload } from 'undomundo';
+
 type WithSelection<T> = { selection: T };
 
 type MovePayloadRest = WithSelection<MoveActionSelectionState>;
 type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
 type IdRest = { id: string };
-export interface PBT {
-  moveCards: PayloadFromTo<VectorData> & MovePayloadRest;
-  scaleCards: PayloadFromTo<BoundsData> & ScalePayloadRest;
-  addCard: CardData;
-  removeCards: {
-    card: CardData;
-    index: number;
-  }[];
-  reorderCard: PayloadFromTo<number> & IdRest;
-  updateText: PayloadFromTo<string> & IdRest;
-  updateColor: {
+export type PBT = {
+  moveCards: RelativePayloadConfig<
+    AbsolutePayload<VectorData> & MovePayloadRest
+  >;
+  scaleCards: RelativePayloadConfig<
+    AbsolutePayload<BoundsData> & ScalePayloadRest
+  >;
+  addCard: RelativePayloadConfig<CardData>;
+  removeCards: RelativePayloadConfig<
+    {
+      card: CardData;
+      index: number;
+    }[]
+  >;
+  reorderCard: RelativePayloadConfig<AbsolutePayload<number> & IdRest>;
+  updateText: RelativePayloadConfig<AbsolutePayload<string> & IdRest>;
+  updateColor: RelativePayloadConfig<{
     selection: Record<string, string>;
     to: string;
-  };
-}
+  }>;
+};
 
-export type MoveCardsHandler = (to: VectorData, rest: MovePayloadRest) => void;
-
-export type ScaleCardsHandler = (
-  boundsData: BoundsData,
-  rest: ScalePayloadRest
+export type MoveCardsHandler = (
+  props: Omit<PBT['moveCards']['payload'], 'undo'>
 ) => void;
 
-export type ReorderCardHandler = (toIndex: number, rest: IdRest) => void;
-export type UpdateTextHandler = (newText: string, rest: IdRest) => void;
+export type ScaleCardsHandler = (
+  props: Omit<PBT['scaleCards']['payload'], 'undo'>
+) => void;
+
+export type ReorderCardHandler = (
+  props: Omit<PBT['reorderCard']['payload'], 'undo'>
+) => void;
+export type UpdateTextHandler = (
+  props: Omit<PBT['updateText']['payload'], 'undo'>
+) => void;

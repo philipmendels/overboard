@@ -1,7 +1,7 @@
 import styled from '@emotion/styled';
 import { omit } from 'rambda';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { HandlersByType } from 'use-flexible-undo';
+import { HandlersByType, History } from 'undomundo';
 import { MoveCardsHandler, PBT, ScaleCardsHandler } from '../actions/actions';
 import { createNewCard, CardData } from '../card/card';
 import { Bounds } from '../geom/bounds.model';
@@ -42,7 +42,7 @@ export interface TransformProps {
 
 export type BoardProps = {
   cards: CardData[];
-  undoables: HandlersByType<PBT>;
+  undoables: HandlersByType<PBT, History<PBT, Record<string, unknown>>>;
   moveCardsHandler: MoveCardsHandler;
   scaleCardsHandler: ScaleCardsHandler;
   animate: boolean;
@@ -195,18 +195,14 @@ export const Board: React.FC<BoardProps> = ({
       setDragState(merge({ location: boardLocation }));
     }
     if (dragState.type === 'CARDS') {
-      moveCardsHandler(boardLocation, {
-        selection: dragState.selection,
-      });
+      moveCardsHandler({ redo: boardLocation, selection: dragState.selection });
     } else if (dragState.type === 'TRANSFORM_HANDLE') {
       const ttBounds = getTransformToolBounds({
         startBounds: dragState.startBounds,
         handle: dragState.handle,
         mouseLocation: boardLocation,
       });
-      scaleCardsHandler(ttBounds, {
-        selection: dragState.selection,
-      });
+      scaleCardsHandler({ redo: ttBounds, selection: dragState.selection });
     }
     event.stopPropagation();
   };
@@ -231,16 +227,18 @@ export const Board: React.FC<BoardProps> = ({
           select(cardIdsToSelect);
         }
       } else if (dragState.type === 'CARDS') {
+        const selection = dragState.selection;
         moveCards({
-          selection: dragState.selection,
-          from: dragState.startLocation,
-          to: boardLocation,
+          undo: dragState.startLocation,
+          redo: boardLocation,
+          selection,
         });
       } else if (dragState.type === 'TRANSFORM_HANDLE') {
+        const selection = dragState.selection;
         scaleCards({
-          from: dragState.startBounds,
-          to: getSelectionBounds(),
-          selection: dragState.selection,
+          undo: dragState.startBounds,
+          redo: getSelectionBounds(),
+          selection,
         });
       }
     }
@@ -628,10 +626,11 @@ export const Board: React.FC<BoardProps> = ({
           if (dialogCardId) {
             const c = getCardById(dialogCardId);
             if (c && c.text !== dialogState) {
+              const id = dialogCardId;
               updateText({
-                from: c.text,
-                to: dialogState,
-                id: dialogCardId,
+                undo: c.text,
+                redo: dialogState,
+                id,
               });
             }
           }

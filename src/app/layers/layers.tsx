@@ -7,14 +7,14 @@ import {
 } from 'react-beautiful-dnd';
 import styled from '@emotion/styled';
 import { handleSelection, isItemInSelectionRecord } from '../util/util';
-import { HandlersByType } from 'use-flexible-undo';
+import { HandlersByType, History } from 'undomundo';
 import { PBT } from '../actions/actions';
 import { CardData } from '../card/card';
 import { SelectionProps } from '../actions/selection';
 
 type Props = {
   cards: CardData[];
-  undoables: HandlersByType<PBT>;
+  undoables: HandlersByType<PBT, History<PBT, Record<string, unknown>>>;
 } & SelectionProps;
 
 export const Layers: React.FC<Props> = ({
@@ -36,10 +36,11 @@ export const Layers: React.FC<Props> = ({
       return;
     }
     const sourceIndex = reverseIndex(result.source.index);
+    const id = cards[sourceIndex].id;
     reorderCard({
-      from: sourceIndex,
-      to: reverseIndex(result.destination.index),
-      id: cards[sourceIndex].id,
+      undo: sourceIndex,
+      redo: reverseIndex(result.destination.index),
+      id,
     });
   };
 
