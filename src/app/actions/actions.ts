@@ -6,7 +6,7 @@ import {
   ScaleActionSelectionState,
 } from './selection';
 
-import { RelativePayloadConfig, AbsolutePayload } from 'undomundo';
+import { CustomPayloadConfig, AbsolutePayload } from 'undomundo';
 
 type WithSelection<T> = { selection: T };
 
@@ -14,22 +14,20 @@ type MovePayloadRest = WithSelection<MoveActionSelectionState>;
 type ScalePayloadRest = WithSelection<ScaleActionSelectionState>;
 type IdRest = { id: string };
 export type PBT = {
-  moveCards: RelativePayloadConfig<
-    AbsolutePayload<VectorData> & MovePayloadRest
-  >;
-  scaleCards: RelativePayloadConfig<
+  moveCards: CustomPayloadConfig<AbsolutePayload<VectorData> & MovePayloadRest>;
+  scaleCards: CustomPayloadConfig<
     AbsolutePayload<BoundsData> & ScalePayloadRest
   >;
-  addCard: RelativePayloadConfig<CardData>;
-  removeCards: RelativePayloadConfig<
+  addCard: CustomPayloadConfig<CardData>;
+  removeCards: CustomPayloadConfig<
     {
       card: CardData;
       index: number;
     }[]
   >;
-  reorderCard: RelativePayloadConfig<AbsolutePayload<number> & IdRest>;
-  updateText: RelativePayloadConfig<AbsolutePayload<string> & IdRest>;
-  updateColor: RelativePayloadConfig<{
+  reorderCard: CustomPayloadConfig<AbsolutePayload<number> & IdRest>;
+  updateText: CustomPayloadConfig<AbsolutePayload<string> & IdRest>;
+  updateColor: CustomPayloadConfig<{
     selection: Record<string, string>;
     to: string;
   }>;

@@ -12,7 +12,7 @@ import { V } from '../geom/vector.model';
 
 type PayloadDescribers<PBT2 extends PayloadConfigByType> = {
   [K in keyof PBT2]: (
-    payload: HistoryPayload<PBT2[K]['payload'], PBT2[K]['isRelative']>
+    payload: HistoryPayload<PBT2[K]['payload'], PBT2[K]['isCustom']>
   ) => ReactNode;
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "overboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "source": "src/index.html",
   "keywords": [],
@@ -29,7 +29,7 @@
     "react-dom": "^17.0.2",
     "react-icons": "^3.11.0",
     "react-use-gesture": "^8.0.0",
-    "use-flexible-undo": "^0.2.0",
+    "use-flexible-undo": "^0.3.0",
     "use-resize-observer": "^7.0.0",
     "uuid": "^3.4.0"
   },
